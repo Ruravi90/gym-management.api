@@ -9,8 +9,11 @@ RUN apt-get update && apt-get install -y \
     libxext6 \
     libxrender-dev \
     libgomp1 \
-    libgl1-mesa-glx \
     && rm -rf /var/lib/apt/lists/*
+
+# Set environment variables for headless operation
+ENV DISPLAY=:0
+ENV QT_QPA_PLATFORM=offscreen
 
 # Set working directory
 WORKDIR /app
