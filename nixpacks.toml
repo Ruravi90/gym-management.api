@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["...", "python3", "python3Packages.pip", "python3Packages.setuptools", "python3Packages.poetry", "gcc", "libglvnd", "glib"]
+nixPkgs = ["...", "python3", "python3Packages.pip", "python3Packages.setuptools", "poetry", "gcc", "libglvnd", "glib"]
 aptPkgs = ["libgl1", "libglib2.0-0"]
 
 [phases.install]
