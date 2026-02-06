@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     libxext6 \
     libxrender-dev \
     libgomp1 \
+    libglvnd0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Set environment variables for headless operation
