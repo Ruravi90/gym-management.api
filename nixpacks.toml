@@ -1,12 +1,10 @@
 [phases.setup]
-nixPkgs = ["...", "python3", "python3Packages.pip", "python3Packages.setuptools", "gcc", "libglvnd", "glib"]
+nixPkgs = ["...", "python3", "python3Packages.pip", "python3Packages.setuptools", "python3Packages.poetry", "gcc", "libglvnd", "glib"]
 aptPkgs = ["libgl1", "libglib2.0-0"]
 
 [phases.install]
 dependsOn = ["setup"]
 cmds = [
-  "python -m ensurepip --upgrade",
-  "pip install poetry",
   "poetry config virtualenvs.create false",
   "poetry install --only=main"
 ]
