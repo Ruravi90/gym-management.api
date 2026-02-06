@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     # Database configuration - Railway often provides DATABASE_URL
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "mysql+pymysql://app:Ruravi90@localhost/GymControl")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "mysql+pymysql://app:Ruravi90@127.0.0.1:3306/GymControl")
 
     # Secret key for JWT tokens - should be set in Railway environment
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-123-change-in-production")

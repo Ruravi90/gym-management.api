@@ -3,6 +3,9 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from app.config import settings
 
+# Import PyMySQL to ensure dialect is registered with SQLAlchemy
+import pymysql
+
 # Use the database URL from settings
 SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
 

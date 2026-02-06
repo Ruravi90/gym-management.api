@@ -9,6 +9,8 @@ RUN apt-get update && apt-get install -y \
     libxext6 \
     libxrender-dev \
     libgomp1 \
+    libgl1-mesa-glx \
+    libgfortran3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
