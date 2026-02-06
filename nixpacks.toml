@@ -1,11 +1,12 @@
 [phases.setup]
-nixPkgs = ["...", "python3", "python3Packages.pip", "python3Packages.setuptools", "poetry", "gcc", "libglvnd", "glib"]
+nixPkgs = ["...", "python3", "python3Packages.pip", "python3Packages.setuptools", "poetry", "python3Packages.opencv4", "gcc", "libglvnd", "glib"]
 aptPkgs = ["libgl1", "libglib2.0-0"]
 
 [phases.install]
 dependsOn = ["setup"]
 cmds = [
   "poetry config virtualenvs.create false",
+  "poetry config installer.no-binary opencv-python-headless",
   "poetry install --only=main"
 ]
 
