@@ -1,0 +1,7 @@
+[phases.setup]
+nixPkgs = ["...", "libglvnd", "glib"]
+aptPkgs = ["libgl1", "libglib2.0-0"]
+
+[phases.build]
+dependsOn = ["setup"]
+cmds = ["pip install -r requirements.txt"]
