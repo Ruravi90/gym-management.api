@@ -7,10 +7,9 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
-    libxrender-dev \
+    libxrender1 \
     libgomp1 \
     libgl1 \
-    libgl1-mesa-glx \
     && rm -rf /var/lib/apt/lists/*
 
 # Set environment variables for headless operation
