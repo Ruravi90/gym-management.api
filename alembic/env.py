@@ -8,11 +8,20 @@ from alembic import context
 # Import the database configuration and models
 import sys
 import os
+# Ensure project root is on sys.path so we can import the `app` package
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
-from database import Base
-# Import all models to ensure they are registered with the Base metadata
-from models import user, attendance, membership, facial_encoding, gym_class
+# Prefer importing the application package modules so Alembic runs in the
+# same module layout as the application (imports like `app.database`).
+try:
+    from app.database import Base
+    # Import all models to ensure they are registered with the Base metadata
+    # Add any new model modules here so Alembic sees their metadata.
+    from app.models import user, attendance, membership, facial_encoding, gym_class, client
+except Exception:
+    # Fallback for environments where `app` package cannot be imported; try local imports
+    from database import Base
+    from models import user, attendance, membership, facial_encoding, gym_class, client
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

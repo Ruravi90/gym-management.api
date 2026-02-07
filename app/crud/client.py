@@ -27,7 +27,11 @@ def search_clients(db: Session, search_term: str, skip: int = 0, limit: int = 10
     return query.offset(skip).limit(limit).all()
 
 def create_client(db: Session, client: ClientCreate):
-    hashed_password = hash_password(client.password)
+    # Password is optional for clients. Only hash/store if provided.
+    hashed_password = None
+    if getattr(client, 'password', None):
+        hashed_password = hash_password(client.password)
+
     db_client = Client(
         email=client.email,
         name=client.name,

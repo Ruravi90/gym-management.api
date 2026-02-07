@@ -18,7 +18,6 @@ def create_user(db: Session, user: UserCreate):
         email=user.email,
         name=user.name,
         phone=user.phone,
-        membership_type=user.membership_type,
         role=user.role,
         hashed_password=hashed_password
     )

@@ -9,7 +9,7 @@ class ClientBase(BaseModel):
     membership_type: Optional[str] = "basic"
 
 class ClientCreate(ClientBase):
-    password: str  # For client accounts if they need to log in
+    password: Optional[str] = None  # Optional initial password (clients usually don't need one)
 
 class ClientUpdate(BaseModel):
     name: Optional[str] = None

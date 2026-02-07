@@ -69,3 +69,25 @@ def startup_event():
     except Exception as e:
         print(f"Database connection error during startup: {e}")
         print("Application will continue running but database features may not be available.")
+
+    # Run Alembic migrations automatically on startup
+    try:
+        from alembic.config import Config
+        from alembic import command
+        from pathlib import Path
+
+        base_dir = Path(__file__).resolve().parents[1]
+        alembic_ini = base_dir / "alembic.ini"
+        if alembic_ini.exists():
+            alembic_cfg = Config(str(alembic_ini))
+            # Ensure alembic uses the runtime DB URL
+            alembic_cfg.set_main_option('sqlalchemy.url', str(settings.DATABASE_URL))
+            # Use 'heads' to allow applying when multiple branch heads exist.
+            # Note: if migrations truly diverged you may need to create a merge
+            # revision (alembic merge) to resolve branches.
+            command.upgrade(alembic_cfg, 'heads')
+            print("Alembic migrations applied successfully (target: heads).")
+        else:
+            print(f"alembic.ini not found at {alembic_ini}; skipping migrations.")
+    except Exception as me:
+        print(f"Failed to run Alembic migrations at startup: {me}")

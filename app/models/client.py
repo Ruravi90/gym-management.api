@@ -18,6 +18,7 @@ class Client(Base):
     name = Column(String(100), index=True)
     email = Column(String(100), unique=True, index=True)
     phone = Column(String(20))
+    hashed_password = Column(String(100), nullable=True)
     membership_type = Column(String(20), default=MembershipType.BASIC)
     profile_image = Column(String(255), nullable=True)  # Path to profile image for facial recognition
     status = Column(Boolean, default=True)  # Active/inactive client
