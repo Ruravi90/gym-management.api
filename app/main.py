@@ -60,12 +60,6 @@ def startup_event():
     try:
         # Create database tables if they don't exist
         Base.metadata.create_all(bind=engine)
-
-        # Importar y ejecutar los seeders para inicializar datos
-        from app.seeders.run_seeders import run_seeders
-        run_seeders()
-
-        print("Database tables created and seeders executed successfully!")
     except Exception as e:
         print(f"Database connection error during startup: {e}")
         print("Application will continue running but database features may not be available.")
@@ -89,5 +83,12 @@ def startup_event():
             print("Alembic migrations applied successfully (target: heads).")
         else:
             print(f"alembic.ini not found at {alembic_ini}; skipping migrations.")
+        
+        # Importar y ejecutar los seeders para inicializar datos
+        from app.seeders.run_seeders import run_seeders
+        run_seeders()
+
+        print("Database tables created and seeders executed successfully!")    
+        
     except Exception as me:
         print(f"Failed to run Alembic migrations at startup: {me}")
