@@ -12,6 +12,10 @@ def add_security_middleware(app: FastAPI):
     # Add rate limiting
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+    # Add ProxyHeadersMiddleware to trust X-Forwarded-Proto (fixes Mixed Content redirects)
+    from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+    app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
     
     # Add custom security headers
     @app.middleware("http")

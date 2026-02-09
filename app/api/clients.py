@@ -10,19 +10,19 @@ from app.models.user import User as UserModel
 router = APIRouter()
 face_service = FacialRecognitionService()
 
-@router.post("/", response_model=schemas.Client)
+@router.post("", response_model=schemas.Client)
 def create_client(client: schemas.ClientCreate, db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
     db_client = crud.client.get_client_by_email(db, email=client.email)
     if db_client:
         raise HTTPException(status_code=400, detail="Email already registered")
     return crud.client.create_client(db=db, client=client)
 
-@router.get("/", response_model=List[schemas.Client])
+@router.get("", response_model=List[schemas.Client])
 def read_clients(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
     clients = crud.client.get_clients(db, skip=skip, limit=limit)
     return clients
 
-@router.get("/search/", response_model=List[schemas.Client])
+@router.get("/search", response_model=List[schemas.Client])
 def search_clients(search: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
     clients = crud.client.search_clients(db, search_term=search, skip=skip, limit=limit)
     return clients
