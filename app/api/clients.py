@@ -19,8 +19,16 @@ def create_client(client: schemas.ClientCreate, db: Session = Depends(get_db), c
 
 @router.get("/", response_model=List[schemas.Client])
 def read_clients(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
-    clients = crud.client.get_clients(db, skip=skip, limit=limit)
-    return clients
+    try:
+        print(f"DEBUG: accessing read_clients. User: {current_user.email}, Skip: {skip}, Limit: {limit}")
+        clients = crud.client.get_clients(db, skip=skip, limit=limit)
+        print(f"DEBUG: retrieved {len(clients)} clients")
+        return clients
+    except Exception as e:
+        print(f"ERROR in read_clients: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 @router.get("/search/", response_model=List[schemas.Client])
 def search_clients(search: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
