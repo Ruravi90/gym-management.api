@@ -25,7 +25,11 @@ add_security_middleware(app)
 from fastapi.middleware.cors import CORSMiddleware
 
 # Configure CORS based on environment
-allow_origins = [settings.FRONTEND_URL] if settings.FRONTEND_URL != "*" else ["*"]
+# Configure CORS based on environment
+if settings.FRONTEND_URL == "*":
+    allow_origins = ["*"]
+else:
+    allow_origins = [origin.strip() for origin in settings.FRONTEND_URL.split(",")]
 
 app.add_middleware(
     CORSMiddleware,
