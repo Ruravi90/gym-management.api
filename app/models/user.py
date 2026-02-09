@@ -16,6 +16,7 @@ class User(Base):
     hashed_password = Column(String(100))
     status = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
     # Note: Users don't have direct relationships to attendance, memberships, or facial encodings
