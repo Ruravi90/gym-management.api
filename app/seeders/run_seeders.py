@@ -1,7 +1,5 @@
 from sqlalchemy.orm import Session
-from app.seeders.membership_seeder import seed_memberships
-from app.seeders.super_admin_seeder import seed_super_admin
-from app.seeders.client_seeder import seed_sample_clients
+from app.seeders.admin_seeder import seed_super_admin
 from app.database import SessionLocal
 
 def run_seeders():
@@ -11,18 +9,16 @@ def run_seeders():
         print("Starting database seeding process...")
 
         # Seed super admin first
+        print("About to seed super admin...")
         seed_super_admin(db)
-
-        # Seed sample clients (with their active memberships)
-        #seed_sample_clients(db)
-
-        # Only seed default membership templates if needed (these are separate from client memberships)
-        #seed_memberships(db)
+        print("Super admin seeded successfully")
 
         print("Database seeding completed successfully!")
 
     except Exception as e:
         print(f"Error during seeding: {str(e)}")
+        import traceback
+        traceback.print_exc()
         db.rollback()
     finally:
         db.close()

@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
-from models.user import User
-from models.user_role import UserRole
+from app.models.user import User
+from app.models.user_role import UserRole
 from app.utils.auth import hash_password
 
 def seed_super_admin(db: Session):
