@@ -65,17 +65,11 @@ class MembershipCreate(MembershipBase):
 
 
 class MembershipUpdate(BaseModel):
-    client_id: Optional[int] = None
-    membership_type_id: Optional[int] = None
-    type: Optional[str] = None
-    start_date: Optional[Union[datetime, date]] = None
-    end_date: Optional[Union[datetime, date]] = None
-    price: Optional[float] = None
-    price_paid: Optional[float] = None
     status: Optional[str] = None
     payment_status: Optional[str] = None
     payment_method: Optional[str] = None
     notes: Optional[str] = None
+
 
 
 

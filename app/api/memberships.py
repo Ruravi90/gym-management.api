@@ -121,13 +121,8 @@ async def update_membership(
             detail="Not authorized to update this membership"
         )
 
-    # Verify client exists if client_id is being updated
-    if membership_update.client_id:
-        client = await crud.client.get_client(client_id=membership_update.client_id)
-        if not client:
-            raise HTTPException(status_code=404, detail="Client not found")
-
     return await crud.membership.update_membership(
+
         membership_id=membership_id,
         membership_update=membership_update.dict(exclude_unset=True)
     )
