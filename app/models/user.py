@@ -1,23 +1,34 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean
-from sqlalchemy.orm import relationship
+from tortoise.models import Model
+from tortoise import fields
+from enum import Enum
 from datetime import datetime
-from ..database import Base
-from .user_role import UserRole
-import enum
 
-class User(Base):
-    __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), index=True)
-    email = Column(String(100), unique=True, index=True)
-    phone = Column(String(20))
-    role = Column(String(20), default=UserRole.MEMBER)  # Role of the user in the system
-    hashed_password = Column(String(100))
-    status = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+class UserRoleEnum(str, Enum):
+    ADMIN = "admin"
+    MANAGER = "manager"
+    RECEPTIONIST = "receptionist"
+    USER = "user"
+    SUPER_ADMIN = "super_admin"
 
+
+class User(Model):
+    id = fields.IntField(pk=True)
+    name = fields.CharField(max_length=100)
+    email = fields.CharField(max_length=100, unique=True)
+    phone = fields.CharField(max_length=20, null=True)
+    role = fields.CharEnumField(UserRoleEnum, default=UserRoleEnum.USER)
+    hashed_password = fields.CharField(max_length=100)
+    status = fields.BooleanField(default=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+    
     # Relationships
-    # Note: Users don't have direct relationships to attendance, memberships, or facial encodings
-    # These belong to clients, not system users
+    memberships: fields.ReverseRelation["Membership"]
+    
+    class Meta:
+        table = "users"
+        indexes = [("email",), ("role",), ("created_at",)]
+    
+    def __str__(self):
+        return self.name

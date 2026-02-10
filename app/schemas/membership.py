@@ -2,6 +2,7 @@ from typing import Optional, List
 from pydantic import BaseModel
 from datetime import datetime
 
+
 class MembershipTypeBase(BaseModel):
     name: str
     duration_days: Optional[int] = None
@@ -10,8 +11,10 @@ class MembershipTypeBase(BaseModel):
     description: Optional[str] = None
     is_active: bool = True
 
+
 class MembershipTypeCreate(MembershipTypeBase):
     pass
+
 
 class MembershipTypeUpdate(BaseModel):
     name: Optional[str] = None
@@ -21,6 +24,7 @@ class MembershipTypeUpdate(BaseModel):
     description: Optional[str] = None
     is_active: Optional[bool] = None
 
+
 class MembershipType(MembershipTypeBase):
     id: int
     created_at: Optional[datetime] = None
@@ -29,10 +33,11 @@ class MembershipType(MembershipTypeBase):
     class Config:
         from_attributes = True
 
+
 class MembershipBase(BaseModel):
     client_id: int
     membership_type_id: Optional[int] = None  # New field referencing membership type
-    type: Optional[str] = None  # Kept for backward compatibility during migration
+    type: Optional[str] = "basic"  # Kept for backward compatibility during migration
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     price: float
@@ -40,10 +45,13 @@ class MembershipBase(BaseModel):
     status: Optional[str] = "active"  # active, expired, suspended, cancelled
     payment_status: Optional[str] = "pending"  # pending, paid, overdue
     payment_method: Optional[str] = None  # cash, card, bank_transfer, online
+    accesses_used: int = 0  # For punch-based memberships
     notes: Optional[str] = None
+
 
 class MembershipCreate(MembershipBase):
     pass
+
 
 class MembershipUpdate(BaseModel):
     membership_type_id: Optional[int] = None
@@ -55,14 +63,15 @@ class MembershipUpdate(BaseModel):
     payment_method: Optional[str] = None
     notes: Optional[str] = None
 
+
 class Membership(MembershipBase):
     id: int
-    accesses_used: int = 0  # For punch-based memberships
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+
 
 class MembershipStatistics(BaseModel):
     total_memberships: int
@@ -73,6 +82,7 @@ class MembershipStatistics(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 class PunchUsage(BaseModel):
     total_accesses_allowed: Optional[int]  # None means unlimited

@@ -1,31 +1,24 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean
-from sqlalchemy.orm import relationship
-from ..database import Base
+from tortoise.models import Model
+from tortoise import fields
 from datetime import datetime
-import enum
 
-class MembershipType(str, enum.Enum):
-    BASIC = "basic"
-    PREMIUM = "premium"
-    VIP = "vip"
-    STUDENT = "student"
-    FAMILY = "family"
 
-class Client(Base):
-    __tablename__ = "clients"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), index=True)
-    email = Column(String(100), unique=True, index=True)
-    phone = Column(String(20))
-    hashed_password = Column(String(100), nullable=True)
-    membership_type = Column(String(20), default=MembershipType.BASIC)
-    profile_image = Column(String(255), nullable=True)  # Path to profile image for facial recognition
-    status = Column(Boolean, default=True)  # Active/inactive client
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
+class Client(Model):
+    id = fields.IntField(pk=True)
+    name = fields.CharField(max_length=100)
+    email = fields.CharField(max_length=100, unique=True)
+    phone = fields.CharField(max_length=20, null=True)
+    membership_type = fields.CharField(max_length=50, null=True)  # basic, premium, vip
+    status = fields.BooleanField(default=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+    
     # Relationships
-    attendance = relationship("Attendance", back_populates="client")
-    memberships = relationship("Membership", back_populates="client")
-    facial_encoding = relationship("FacialEncoding", back_populates="client", uselist=False)
+    memberships: fields.ReverseRelation["Membership"]
+    
+    class Meta:
+        table = "clients"
+        indexes = [("email",), ("status",), ("created_at",), ("membership_type",)]
+    
+    def __str__(self):
+        return self.name

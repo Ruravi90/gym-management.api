@@ -30,9 +30,7 @@ from typing import Optional
 from jose import JWTError, jwt
 from fastapi import HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
 from app.config import settings
-from app.database import get_db
 from app.models.user import User
 
 # OAuth2 scheme for token authentication
@@ -66,7 +64,8 @@ def verify_token(token: str) -> Optional[dict]:
     except JWTError:
         return None
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
     """Get the current authenticated user from the token."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -82,15 +81,21 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     if user_id is None:
         raise credentials_exception
     
-    user = db.query(User).filter(User.id == int(user_id)).first()
-    if user is None:
+    try:
+        user = await User.get_or_none(id=int(user_id))
+        if user is None:
+            raise credentials_exception
+        return user
+    except Exception:
         raise credentials_exception
-    
-    return user
 
-def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
+
+async def authenticate_user(email: str, password: str) -> Optional[User]:
     """Authenticate a user by email and password."""
-    user = db.query(User).filter(User.email == email).first()
-    if not user or not verify_password(password, user.hashed_password):
+    try:
+        user = await User.get_or_none(email=email)
+        if not user or not verify_password(password, user.hashed_password):
+            return None
+        return user
+    except Exception:
         return None
-    return user

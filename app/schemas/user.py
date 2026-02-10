@@ -1,28 +1,33 @@
 from typing import Optional
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from datetime import datetime
-from ..models.user_role import UserRole
+
 
 class UserBase(BaseModel):
-    email: EmailStr
-    name: Optional[str] = None
+    name: str
+    email: str
     phone: Optional[str] = None
-    role: Optional[str] = UserRole.MEMBER
+    role: str = "user"  # admin, manager, receptionist, user, super_admin
+
 
 class UserCreate(UserBase):
     password: str
 
+
 class UserUpdate(BaseModel):
     name: Optional[str] = None
+    email: Optional[str] = None
     phone: Optional[str] = None
-    email: Optional[EmailStr] = None
     role: Optional[str] = None
+    password: Optional[str] = None
     status: Optional[bool] = None
+
 
 class User(UserBase):
     id: int
-    status: bool
-    created_at: datetime
+    status: bool = True
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

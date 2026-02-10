@@ -1,0 +1,129 @@
+from tortoise import BaseDBAsyncClient
+
+RUN_IN_TRANSACTION = True
+
+
+async def upgrade(db: BaseDBAsyncClient) -> str:
+    return """
+        CREATE TABLE IF NOT EXISTS `attendance` (
+    `id` INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    `client_id` INT NOT NULL,
+    `check_in_time` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    `check_out_time` DATETIME(6),
+    `device_id` VARCHAR(100),
+    `notes` VARCHAR(255)
+) CHARACTER SET utf8mb4;
+CREATE TABLE IF NOT EXISTS `clients` (
+    `id` INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    `name` VARCHAR(100) NOT NULL,
+    `email` VARCHAR(100) NOT NULL UNIQUE,
+    `phone` VARCHAR(20),
+    `membership_type` VARCHAR(50),
+    `status` BOOL NOT NULL DEFAULT 1,
+    `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+) CHARACTER SET utf8mb4;
+CREATE TABLE IF NOT EXISTS `facial_encodings` (
+    `id` INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    `client_id` INT NOT NULL,
+    `encoding_data` LONGTEXT NOT NULL,
+    `image_path` VARCHAR(255),
+    `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+) CHARACTER SET utf8mb4;
+CREATE TABLE IF NOT EXISTS `classes` (
+    `id` INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    `name` VARCHAR(100) NOT NULL,
+    `description` LONGTEXT,
+    `instructor` VARCHAR(100) NOT NULL,
+    `capacity` INT NOT NULL,
+    `start_time` DATETIME(6) NOT NULL,
+    `end_time` DATETIME(6) NOT NULL,
+    `status` VARCHAR(20) NOT NULL DEFAULT 'scheduled',
+    `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+) CHARACTER SET utf8mb4;
+CREATE TABLE IF NOT EXISTS `memberships` (
+    `id` INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    `client_id` INT NOT NULL,
+    `membership_type_id` INT,
+    `type` VARCHAR(50) NOT NULL DEFAULT 'basic',
+    `start_date` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    `end_date` DATETIME(6) NOT NULL,
+    `price` DOUBLE NOT NULL,
+    `price_paid` DOUBLE,
+    `status` VARCHAR(20) NOT NULL DEFAULT 'active',
+    `payment_status` VARCHAR(20) NOT NULL DEFAULT 'pending',
+    `payment_method` VARCHAR(50),
+    `accesses_used` INT NOT NULL DEFAULT 0,
+    `notes` VARCHAR(255),
+    `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+) CHARACTER SET utf8mb4;
+CREATE TABLE IF NOT EXISTS `membership_types` (
+    `id` INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    `name` VARCHAR(50) NOT NULL UNIQUE,
+    `duration_days` INT,
+    `accesses_allowed` INT,
+    `price` DOUBLE NOT NULL,
+    `description` VARCHAR(255),
+    `is_active` BOOL NOT NULL DEFAULT 1,
+    `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+) CHARACTER SET utf8mb4;
+CREATE TABLE IF NOT EXISTS `users` (
+    `id` INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    `name` VARCHAR(100) NOT NULL,
+    `email` VARCHAR(100) NOT NULL UNIQUE,
+    `phone` VARCHAR(20),
+    `role` VARCHAR(12) NOT NULL COMMENT 'ADMIN: admin\nMANAGER: manager\nRECEPTIONIST: receptionist\nUSER: user\nSUPER_ADMIN: super_admin' DEFAULT 'user',
+    `hashed_password` VARCHAR(100) NOT NULL,
+    `status` BOOL NOT NULL DEFAULT 1,
+    `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+) CHARACTER SET utf8mb4;
+CREATE TABLE IF NOT EXISTS `aerich` (
+    `id` INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    `version` VARCHAR(255) NOT NULL,
+    `app` VARCHAR(100) NOT NULL,
+    `content` JSON NOT NULL
+) CHARACTER SET utf8mb4;"""
+
+
+async def downgrade(db: BaseDBAsyncClient) -> str:
+    return """
+        """
+
+
+MODELS_STATE = (
+    "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"
+)

@@ -2,9 +2,9 @@ import os
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    # Database configuration - Railway often provides DATABASE_URL
-    #DATABASE_URL: str = os.getenv("DATABASE_URL", "mysql+pymysql://app:Ruravi90@127.0.0.1:3306/GymControl")
-    DATABASE_URL: str = os.getenv("DATABASE_URL_DEV", "mysql+pymysql://root:fknwSVioguFJzVGwyMJzkKDBZApslDlt@turntable.proxy.rlwy.net:49303/railway")
+    # Database configuration for Tortoise ORM
+    #DATABASE_URL: str = os.getenv("DATABASE_URL", "mysql://root:fknwSVioguFJzVGwyMJzkKDBZApslDlt@turntable.proxy.rlwy.net:49303/railway")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "mysql://app:Ruravi90@localhost:3306/GymControl")
     # Secret key for JWT tokens - should be set in Railway environment
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-123-change-in-production")
 
@@ -24,3 +24,29 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "*")
 
 settings = Settings()
+
+# Configuration for Tortoise ORM with optimizations
+TORTOISE_CONFIG = {
+    "connections": {
+        "default": settings.DATABASE_URL
+    },
+    "apps": {
+        "models": {
+            "models": ["app.models"],
+            "default_connection": "default",
+        },
+        "aerich": {
+            "models": ["aerich.models"],
+            "default_connection": "default",
+        }
+    },
+    "use_tz": False,
+    "timezone": "UTC",
+    # Performance optimizations
+    "_comment": "Pool configuration for MySQL connections",
+    "db_client_kwargs": {
+        "charset": "utf8mb4",
+        "sql_mode": "STRICT_TRANS_TABLES",
+        "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+    }
+}

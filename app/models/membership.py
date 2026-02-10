@@ -1,42 +1,56 @@
-from sqlalchemy import Column, Integer, String, DateTime, Float, ForeignKey, Boolean
-from sqlalchemy.orm import relationship
-from ..database import Base
+from tortoise.models import Model
+from tortoise import fields
 from datetime import datetime
-
-class MembershipType(Base):
-    __tablename__ = "membership_types"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(50), unique=True, nullable=False)  # "Day Pass", "Weekly", "Monthly", "Annual"
-    duration_days = Column(Integer)  # 1 for day pass, 7 for weekly, 30 for monthly, 365 for annual
-    accesses_allowed = Column(Integer, nullable=True)  # NULL means unlimited, specific number for punch passes
-    price = Column(Float, nullable=False)
-    description = Column(String(255))
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    memberships = relationship("Membership", back_populates="membership_type")
+from .user import User
+from .client import Client
 
 
-class Membership(Base):
-    __tablename__ = "memberships"
+class MembershipType(Model):
+    id = fields.IntField(pk=True)
+    name = fields.CharField(max_length=50, unique=True)  # "Day Pass", "Weekly", "Monthly", "Annual"
+    duration_days = fields.IntField(null=True)  # 1 for day pass, 7 for weekly, 30 for monthly, 365 for annual
+    accesses_allowed = fields.IntField(null=True)  # None means unlimited, specific number for punch passes
+    price = fields.FloatField()
+    description = fields.CharField(max_length=255, null=True)
+    is_active = fields.BooleanField(default=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+    
+    # Relationship
+    memberships: fields.ReverseRelation["Membership"]
+    
+    class Meta:
+        table = "membership_types"
+        indexes = [("is_active",), ("created_at",)]
+    
+    def __str__(self):
+        return self.name
 
-    id = Column(Integer, primary_key=True, index=True)
-    client_id = Column(Integer, ForeignKey("clients.id"))
-    membership_type_id = Column(Integer, ForeignKey("membership_types.id"))  # Reference to type
-    type = Column(String(50))  # Kept for backward compatibility during migration
-    start_date = Column(DateTime, default=datetime.utcnow)
-    end_date = Column(DateTime)
-    price = Column(Float)  # Original price
-    price_paid = Column(Float)  # Actual price paid (may differ due to discounts)
-    status = Column(String(20), default="active")  # active, expired, suspended, cancelled
-    payment_status = Column(String(20), default="pending")  # pending, paid, overdue
-    payment_method = Column(String(50))  # cash, card, bank_transfer, online
-    accesses_used = Column(Integer, default=0)  # For punch-based memberships
-    notes = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    client = relationship("Client", back_populates="memberships")
-    membership_type = relationship("MembershipType", back_populates="memberships")
+class Membership(Model):
+    id = fields.IntField(pk=True)
+    client_id = fields.IntField()  # Foreign key reference (using IntField instead of ForeignKeyField for simplicity)
+    membership_type_id = fields.IntField(null=True)  # Reference to type (can be null for legacy memberships)
+    type = fields.CharField(max_length=50, default="basic")  # Kept for backward compatibility during migration
+    start_date = fields.DatetimeField(auto_now_add=True)
+    end_date = fields.DatetimeField()
+    price = fields.FloatField()  # Original price
+    price_paid = fields.FloatField(null=True)  # Actual price paid (may differ due to discounts)
+    status = fields.CharField(max_length=20, default="active")  # active, expired, suspended, cancelled
+    payment_status = fields.CharField(max_length=20, default="pending")  # pending, paid, overdue
+    payment_method = fields.CharField(max_length=50, null=True)  # cash, card, bank_transfer, online
+    accesses_used = fields.IntField(default=0)  # For punch-based memberships
+    notes = fields.CharField(max_length=255, null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+    
+    # Relationships (using reverse relations since we're using IntField)
+    membership_type: fields.ReverseRelation["MembershipType"]
+    client: fields.ReverseRelation["Client"]
+    
+    class Meta:
+        table = "memberships"
+        indexes = [("client_id",), ("status",), ("payment_status",), ("start_date",), ("end_date",)]
+    
+    def __str__(self):
+        return f"{self.client_id} - {self.type}"

@@ -1,62 +1,57 @@
-from sqlalchemy.orm import Session
-from ..models.client import Client
-from ..schemas.client import ClientCreate, ClientUpdate
-from ..utils.auth import hash_password
-
-def get_client(db: Session, client_id: int):
-    return db.query(Client).filter(Client.id == client_id).first()
-
-def get_client_by_email(db: Session, email: str):
-    return db.query(Client).filter(Client.email == email).first()
-
-def get_clients(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(Client).offset(skip).limit(limit).all()
+from typing import List, Optional
+from app.models.client import Client
+from tortoise.exceptions import DoesNotExist
 
 
-def search_clients(db: Session, search_term: str, skip: int = 0, limit: int = 100):
-    """Search clients by name or email"""
-    query = db.query(Client)
+async def get_client(client_id: int) -> Optional[Client]:
+    """Get a specific client by ID"""
+    try:
+        return await Client.get(id=client_id)
+    except DoesNotExist:
+        return None
 
-    # Search by name or email (case insensitive)
-    search_pattern = f"%{search_term}%"
-    query = query.filter(
-        (Client.name.ilike(search_pattern)) |
-        (Client.email.ilike(search_pattern))
-    )
 
-    return query.offset(skip).limit(limit).all()
+async def get_client_by_email(email: str) -> Optional[Client]:
+    """Get a client by email"""
+    try:
+        return await Client.get(email=email)
+    except DoesNotExist:
+        return None
 
-def create_client(db: Session, client: ClientCreate):
-    # Password is optional for clients. Only hash/store if provided.
-    hashed_password = None
-    if getattr(client, 'password', None):
-        hashed_password = hash_password(client.password)
 
-    db_client = Client(
-        email=client.email,
-        name=client.name,
-        phone=client.phone,
-        membership_type=client.membership_type,
-        hashed_password=hashed_password
-    )
-    db.add(db_client)
-    db.commit()
-    db.refresh(db_client)
-    return db_client
+async def get_clients(skip: int = 0, limit: int = 100) -> List[Client]:
+    """Get all clients with pagination"""
+    return await Client.all().offset(skip).limit(limit)
 
-def update_client(db: Session, client_id: int, client_update: ClientUpdate):
-    db_client = get_client(db, client_id)
-    if db_client:
-        update_data = client_update.dict(exclude_unset=True)
-        for field, value in update_data.items():
-            setattr(db_client, field, value)
-        db.commit()
-        db.refresh(db_client)
-    return db_client
 
-def delete_client(db: Session, client_id: int):
-    db_client = get_client(db, client_id)
-    if db_client:
-        db.delete(db_client)
-        db.commit()
-    return db_client
+async def create_client(client_data: dict) -> Client:
+    """Create a new client"""
+    return await Client.create(**client_data)
+
+
+async def update_client(client_id: int, client_update: dict) -> Optional[Client]:
+    """Update a client"""
+    client = await get_client(client_id)
+    if client:
+        for field, value in client_update.items():
+            setattr(client, field, value)
+        await client.save()
+    return client
+
+
+async def delete_client(client_id: int) -> Optional[Client]:
+    """Delete a client"""
+    client = await get_client(client_id)
+    if client:
+        await client.delete()
+    return client
+
+
+async def get_clients_by_membership_type(membership_type: str) -> List[Client]:
+    """Get all clients with a specific membership type"""
+    return await Client.filter(membership_type=membership_type)
+
+
+async def get_active_clients() -> List[Client]:
+    """Get all active clients"""
+    return await Client.filter(status=True)

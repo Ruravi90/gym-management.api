@@ -1,11 +1,29 @@
+import bcrypt
+
+# Fix for passlib compatibility with bcrypt 4.0+
+if not hasattr(bcrypt, "__about__"):
+    bcrypt.__about__ = type("About", (object,), {"__version__": bcrypt.__version__})
+
+# Fix for ValueError: password cannot be longer than 72 bytes
+_original_hashpw = bcrypt.hashpw
+def _patched_hashpw(password, salt):
+    if isinstance(password, str):
+        password_bytes = password.encode('utf-8')
+    else:
+        password_bytes = password
+    # Bcrypt algorithm maximum password length is 72 bytes
+    if len(password_bytes) > 72:
+        password_bytes = password_bytes[:72]
+    return _original_hashpw(password_bytes, salt)
+
+bcrypt.hashpw = _patched_hashpw
+
 from fastapi import FastAPI, Depends, HTTPException, Request
-from sqlalchemy.orm import Session
-from app.database import engine, Base, get_db
-from app import models
 from app.config import settings
+import asyncio
+from aerich import Command
 
 from app.api import users, memberships, attendance
-from app.api.membership_types import router as membership_types_router
 from app.api.clients import router as clients_router
 from app.api.facial_recognition import router as facial_recognition_router
 from app.api.auth import router as auth_router
@@ -26,7 +44,6 @@ add_security_middleware(app)
 from fastapi.middleware.cors import CORSMiddleware
 
 # Configure CORS based on environment
-# Configure CORS based on environment
 if settings.FRONTEND_URL == "*":
     allow_origins = ["*"]
 else:
@@ -46,55 +63,68 @@ app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(users.router, prefix="/users", tags=["users"])
 app.include_router(clients_router, prefix="/clients", tags=["clients"])
 app.include_router(memberships.router, prefix="/memberships", tags=["memberships"])
-app.include_router(membership_types_router, prefix="/membership-types", tags=["membership-types"])
 app.include_router(attendance.router, prefix="/attendance", tags=["attendance"])
 app.include_router(facial_recognition_router, prefix="/facial-recognition", tags=["facial-recognition"])
+
+from tortoise.contrib.fastapi import register_tortoise
+from app.config import TORTOISE_CONFIG
+
+# Register Tortoise ORM with FastAPI
+register_tortoise(
+    app,
+    config=TORTOISE_CONFIG,
+    generate_schemas=True,  # Automatically generate schema
+    add_exception_handlers=True,
+)
+
+# Global flag to ensure seeders run only once
+import threading
+seeder_lock = threading.Lock()
+seeders_executed = False
+
+# Startup event to run seeders after database is initialized
+@app.on_event("startup")
+async def startup_event():
+    global seeders_executed
+    with seeder_lock:
+        if seeders_executed:
+            return
+        seeders_executed = True
+    
+    print("✅ Database schema initialized at startup via Tortoise ORM")
+
+    # Run migrations using Aerich
+    try:
+        command = Command(tortoise_config=TORTOISE_CONFIG, app="models")
+        await command.init()
+        await command.upgrade(run_in_transaction=True)
+        print("✅ Migrations applied successfully")
+    except Exception as e:
+        print(f"❌ Error applying migrations: {str(e)}")
+
+    # Import and run seeders after database initialization
+    try:
+        from app.seeders.seed_data import seed_super_admin, seed_membership_types
+        print("🌱 Starting database seeding process...")
+
+        # Run individual seeders
+        await seed_super_admin()
+        await seed_membership_types()
+
+        print("✅ Database seeding completed at startup!")
+    except Exception as e:
+        print(f"⚠️  Warning: Could not run seeders: {str(e)}")
+        print("💡 This may be due to database connection timing. Server will continue to start.")
+        import traceback
+        traceback.print_exc()
 
 @app.get("/")
 @limiter.limit(common_limits)
 def read_root(request: Request):
     return {"message": "Welcome to Gym Management System API", "environment": settings.ENVIRONMENT}
 
+
 @app.get("/health")
 @limiter.limit(common_limits)
-def health_check(request: Request, db: Session = Depends(get_db)):
+def health_check(request: Request):
     return {"status": "ok", "environment": settings.ENVIRONMENT}
-
-# Add a startup event to initialize the database if needed
-@app.on_event("startup")
-def startup_event():
-    try:
-        # Create database tables if they don't exist
-        Base.metadata.create_all(bind=engine)
-    except Exception as e:
-        print(f"Database connection error during startup: {e}")
-        print("Application will continue running but database features may not be available.")
-
-    # Run Alembic migrations automatically on startup
-    try:
-        from alembic.config import Config
-        from alembic import command
-        from pathlib import Path
-
-        base_dir = Path(__file__).resolve().parents[1]
-        alembic_ini = base_dir / "alembic.ini"
-        if alembic_ini.exists():
-            alembic_cfg = Config(str(alembic_ini))
-            # Ensure alembic uses the runtime DB URL
-            alembic_cfg.set_main_option('sqlalchemy.url', str(settings.DATABASE_URL))
-            # Use 'heads' to allow applying when multiple branch heads exist.
-            # Note: if migrations truly diverged you may need to create a merge
-            # revision (alembic merge) to resolve branches.
-            command.upgrade(alembic_cfg, 'heads')
-            print("Alembic migrations applied successfully (target: heads).")
-        else:
-            print(f"alembic.ini not found at {alembic_ini}; skipping migrations.")
-        
-        # Importar y ejecutar los seeders para inicializar datos
-        from app.seeders.run_seeders import run_seeders
-        run_seeders()
-
-        print("Database tables created and seeders executed successfully!")    
-        
-    except Exception as me:
-        print(f"Failed to run Alembic migrations at startup: {me}")

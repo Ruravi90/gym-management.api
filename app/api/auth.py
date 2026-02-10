@@ -1,22 +1,21 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
-from datetime import timedelta
+from datetime import timedelta, datetime
 from app import crud, schemas
-from app.database import get_db
 from app.utils.auth import authenticate_user, create_access_token
 from app.config import settings
 from app.middleware.security import limiter, auth_limits
+from app.database import get_db
 
 router = APIRouter()
 
 @router.post("/login", response_model=schemas.Token)
 @limiter.limit(auth_limits)
-def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
     """
     OAuth2 compatible login, get an access token for future requests.
     """
-    user = authenticate_user(db, form_data.username, form_data.password)
+    user = await authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -37,7 +36,6 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db
     )
 
     # Calculate expiration time
-    from datetime import datetime
     expires_at = datetime.utcnow() + access_token_expires
 
     return {
@@ -48,12 +46,12 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db
 
 @router.post("/register", response_model=schemas.User)
 @limiter.limit(auth_limits)
-def register(request: Request, user_data: schemas.UserRegister, db: Session = Depends(get_db)):
+async def register(request: Request, user_data: schemas.UserRegister):
     """
     Register a new user.
     """
     # Check if user already exists
-    existing_user = crud.user.get_user_by_email(db, email=user_data.email)
+    existing_user = await crud.user.get_user_by_email(email=user_data.email)
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -69,5 +67,5 @@ def register(request: Request, user_data: schemas.UserRegister, db: Session = De
         password=user_data.password
     )
 
-    user = crud.user.create_user(db=db, user=user_create)
+    user = await crud.user.create_user(user=user_create)
     return user

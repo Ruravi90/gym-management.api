@@ -1,30 +1,72 @@
-from sqlalchemy.orm import Session
-from ..models.attendance import Attendance
-from ..schemas.attendance import AttendanceCreate, AttendanceUpdate
+from typing import List, Optional
 from datetime import datetime
+from app.models.attendance import Attendance
+from app.models.client import Client
+from tortoise.exceptions import DoesNotExist
 
-def get_attendance(db: Session, attendance_id: int):
-    return db.query(Attendance).filter(Attendance.id == attendance_id).first()
 
-def get_attendances_by_client(db: Session, client_id: int):
-    return db.query(Attendance).filter(Attendance.client_id == client_id).all()
+async def get_attendance(attendance_id: int) -> Optional[Attendance]:
+    """Get a specific attendance record by ID"""
+    try:
+        return await Attendance.get(id=attendance_id)
+    except DoesNotExist:
+        return None
 
-def create_attendance(db: Session, attendance: AttendanceCreate):
-    db_attendance = Attendance(
-        client_id=attendance.client_id,
-        check_in=attendance.check_in,
-        check_out=attendance.check_out,
-        date=attendance.date
+
+async def get_attendance_records(skip: int = 0, limit: int = 100) -> List[Attendance]:
+    """Get all attendance records with pagination"""
+    return await Attendance.all().offset(skip).limit(limit)
+
+
+async def get_attendance_by_client(client_id: int) -> List[Attendance]:
+    """Get all attendance records for a specific client"""
+    return await Attendance.filter(client_id=client_id)
+
+
+async def get_attendance_today() -> List[Attendance]:
+    """Get all attendance records for today"""
+    today = datetime.now().date()
+    return await Attendance.filter(
+        check_in_time__date=today
     )
-    db.add(db_attendance)
-    db.commit()
-    db.refresh(db_attendance)
-    return db_attendance
 
-def update_attendance_checkout(db: Session, attendance_id: int, check_out: datetime):
-    db_attendance = get_attendance(db, attendance_id)
-    if db_attendance:
-        db_attendance.check_out = check_out
-        db.commit()
-        db.refresh(db_attendance)
-    return db_attendance
+
+async def create_attendance(attendance_data: dict) -> Attendance:
+    """Create a new attendance record"""
+    return await Attendance.create(**attendance_data)
+
+
+async def update_attendance(attendance_id: int, attendance_update: dict) -> Optional[Attendance]:
+    """Update an attendance record"""
+    attendance = await get_attendance(attendance_id)
+    if attendance:
+        for field, value in attendance_update.items():
+            setattr(attendance, field, value)
+        await attendance.save()
+    return attendance
+
+
+async def delete_attendance(attendance_id: int) -> Optional[Attendance]:
+    """Delete an attendance record"""
+    attendance = await get_attendance(attendance_id)
+    if attendance:
+        await attendance.delete()
+    return attendance
+
+
+async def check_in_client(client_id: int, device_id: str = None) -> Attendance:
+    """Record a client's check-in"""
+    attendance_data = {
+        "client_id": client_id,
+        "device_id": device_id
+    }
+    return await create_attendance(attendance_data)
+
+
+async def check_out_client(attendance_id: int) -> Optional[Attendance]:
+    """Record a client's check-out"""
+    attendance = await get_attendance(attendance_id)
+    if attendance:
+        attendance.check_out_time = datetime.utcnow()
+        await attendance.save()
+    return attendance

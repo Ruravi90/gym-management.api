@@ -1,29 +1,32 @@
 from typing import Optional
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from datetime import datetime
 
+
 class ClientBase(BaseModel):
-    email: EmailStr
-    name: Optional[str] = None
+    name: str
+    email: str
     phone: Optional[str] = None
-    membership_type: Optional[str] = "basic"
+    membership_type: Optional[str] = None  # basic, premium, vip
+    status: bool = True
+
 
 class ClientCreate(ClientBase):
     password: Optional[str] = None  # Optional initial password (clients usually don't need one)
 
+
 class ClientUpdate(BaseModel):
     name: Optional[str] = None
+    email: Optional[str] = None
     phone: Optional[str] = None
-    email: Optional[EmailStr] = None
     membership_type: Optional[str] = None
     status: Optional[bool] = None
-    profile_image: Optional[str] = None
+
 
 class Client(ClientBase):
     id: int
-    status: bool
-    profile_image: Optional[str] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

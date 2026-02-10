@@ -1,17 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
-from sqlalchemy.orm import Session
 from typing import List
 from app import crud, schemas
-from app.database import get_db
 from app.services.facial_recognition import FacialRecognitionService
 from app.middleware.security import limiter, file_upload_limits
+from app.database import get_db
 
 router = APIRouter()
 face_service = FacialRecognitionService()
 
 @router.post("/verify")
 @limiter.limit(file_upload_limits)
-async def verify_identity(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def verify_identity(request: Request, file: UploadFile = File(...)):
     """
     Verify identity using facial recognition.
     Returns client information if recognized.
@@ -19,11 +18,11 @@ async def verify_identity(request: Request, file: UploadFile = File(...), db: Se
     content = await file.read()
 
     try:
-        client_id = face_service.identify_client(content, db)
+        client_id = await face_service.identify_client(content)
         if client_id is None:
             raise HTTPException(status_code=404, detail="Client not recognized")
 
-        client = crud.client.get_client(db, client_id=client_id)
+        client = await crud.client.get_client(client_id=client_id)
         if not client:
             raise HTTPException(status_code=404, detail="Client not found in database")
 
@@ -39,17 +38,17 @@ async def verify_identity(request: Request, file: UploadFile = File(...), db: Se
 
 @router.post("/register/{client_id}")
 @limiter.limit(file_upload_limits)
-async def register_client_face(request: Request, client_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def register_client_face(request: Request, client_id: int, file: UploadFile = File(...)):
     """
     Register a face for a specific client.
     """
-    client = crud.client.get_client(db, client_id=client_id)
+    client = await crud.client.get_client(client_id=client_id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
 
     content = await file.read()
     try:
-        success = face_service.register_face(db, client_id, content)
+        success = await face_service.register_face(client_id, content)
         if success:
             return {"status": "success", "message": "Face registered successfully", "client_id": client_id}
         else:
