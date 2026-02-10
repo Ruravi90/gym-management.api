@@ -94,11 +94,21 @@ async def create_membership(membership_data: dict) -> Membership:
             # Default to 30 days if no duration specified
             end_date = start_date + timedelta(days=30)
     
+    # Calculate price if not provided
+    base_price = membership_data.get('price')
+    if base_price is None and membership_type:
+        base_price = membership_type.price
+    elif base_price is None:
+        base_price = 0.0
+        
     # Set price_paid to membership_type.price if not provided
-    price_paid = membership_data.get('price_paid') or (membership_type.price if membership_type else membership_data['price'])
+    price_paid = membership_data.get('price_paid')
+    if price_paid is None:
+        price_paid = base_price
     
     membership_data['start_date'] = start_date
     membership_data['end_date'] = end_date
+    membership_data['price'] = base_price
     membership_data['price_paid'] = price_paid
     membership_data['type'] = membership_data.get('type') or (membership_type.name if membership_type else "General")
     

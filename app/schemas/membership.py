@@ -1,6 +1,6 @@
-from typing import Optional, List
-from pydantic import BaseModel
-from datetime import datetime
+from typing import Optional, List, Union
+from pydantic import BaseModel, field_validator
+from datetime import datetime, date
 
 
 class MembershipTypeBase(BaseModel):
@@ -38,15 +38,26 @@ class MembershipBase(BaseModel):
     client_id: int
     membership_type_id: Optional[int] = None  # New field referencing membership type
     type: Optional[str] = "basic"  # Kept for backward compatibility during migration
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-    price: float
+    start_date: Optional[Union[datetime, date]] = None
+    end_date: Optional[Union[datetime, date]] = None
+    price: Optional[float] = None
     price_paid: Optional[float] = None  # Actual price paid (may differ from type price)
     status: Optional[str] = "active"  # active, expired, suspended, cancelled
     payment_status: Optional[str] = "pending"  # pending, paid, overdue
     payment_method: Optional[str] = None  # cash, card, bank_transfer, online
     accesses_used: int = 0  # For punch-based memberships
     notes: Optional[str] = None
+
+    @field_validator("start_date", "end_date", mode="before")
+    @classmethod
+    def parse_dates(cls, v):
+        if isinstance(v, str):
+            try:
+                # Try to parse as Date (YYYY-MM-DD)
+                return datetime.strptime(v, "%Y-%m-%d")
+            except ValueError:
+                pass
+        return v
 
 
 class MembershipCreate(MembershipBase):
@@ -56,7 +67,7 @@ class MembershipCreate(MembershipBase):
 class MembershipUpdate(BaseModel):
     membership_type_id: Optional[int] = None
     type: Optional[str] = None
-    end_date: Optional[datetime] = None
+    end_date: Optional[Union[datetime, date]] = None
     price_paid: Optional[float] = None
     status: Optional[str] = None
     payment_status: Optional[str] = None
