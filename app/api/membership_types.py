@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List
 from app import crud, schemas
 from app.utils.auth import get_current_user
-from app.database import get_db
 from app.models.user import User
 
 router = APIRouter()
@@ -43,7 +42,7 @@ async def create_membership_type(
             detail="Not authorized to create membership types"
         )
 
-    return await crud.membership.create_membership_type(membership_type=membership_type)
+    return await crud.membership.create_membership_type(membership_type_data=membership_type.dict())
 
 
 @router.get("/{membership_type_id}", response_model=schemas.MembershipType)
@@ -90,7 +89,7 @@ async def update_membership_type(
 
     return await crud.membership.update_membership_type(
         membership_type_id=membership_type_id,
-        membership_type_update=membership_type_update
+        membership_type_update=membership_type_update.dict(exclude_unset=True)
     )
 
 
@@ -113,4 +112,4 @@ async def delete_membership_type(
     if db_membership_type is None:
         raise HTTPException(status_code=404, detail="Membership type not found")
 
-    return crud.membership.delete_membership_type(db=db, membership_type_id=membership_type_id)
+    return await crud.membership.delete_membership_type(membership_type_id=membership_type_id)

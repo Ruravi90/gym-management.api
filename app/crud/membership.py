@@ -3,6 +3,8 @@ from datetime import datetime, timedelta
 from app.models.membership import Membership, MembershipType
 from app.models.client import Client
 from tortoise.exceptions import DoesNotExist
+from tortoise.expressions import Q
+
 
 
 # CRUD operations for MembershipType
@@ -124,8 +126,8 @@ async def delete_membership(membership_id: int) -> Optional[Membership]:
 async def get_expired_memberships() -> List[Membership]:
     """Get all expired memberships"""
     return await Membership.filter(
-        status="expired"
-    ).or_(end_date__lt=datetime.utcnow())
+        Q(status="expired") | Q(end_date__lt=datetime.utcnow())
+    )
 
 
 async def get_memberships_by_status(status: str) -> List[Membership]:
@@ -154,8 +156,8 @@ async def get_active_memberships_count() -> int:
 async def get_expired_memberships_count() -> int:
     """Get the count of expired memberships"""
     return await Membership.filter(
-        status="expired"
-    ).or_(end_date__lt=datetime.utcnow()).count()
+        Q(status="expired") | Q(end_date__lt=datetime.utcnow())
+    ).count()
 
 
 async def get_upcoming_expirations(days: int = 30) -> List[Membership]:
