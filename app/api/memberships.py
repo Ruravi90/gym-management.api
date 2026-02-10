@@ -30,6 +30,16 @@ async def create_membership(
     if not client:
          raise HTTPException(status_code=404, detail="Client not found")
     
+    # Check if client already has an active membership
+    active_membership = await crud.membership.get_active_membership(membership.client_id)
+    if active_membership:
+        raise HTTPException(
+            status_code=400, 
+            detail="El cliente ya tiene una membresía activa. Por favor, expire o cancele la membresía actual antes de agregar una nueva."
+        )
+
+
+    
     return await crud.membership.create_membership(membership.dict())
 
 
