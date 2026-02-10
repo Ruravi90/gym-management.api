@@ -3,8 +3,10 @@ from typing import List
 from app import crud, models, schemas
 from app.services.facial_recognition import FacialRecognitionService
 from app.utils.auth import get_current_user
-from app.database import get_db
+
 from app.models.user import User as UserModel
+
+from app.utils.logging import logger
 
 router = APIRouter()
 face_service = FacialRecognitionService()
@@ -14,17 +16,17 @@ async def create_client(client: schemas.ClientCreate, current_user: UserModel = 
     db_client = await crud.client.get_client_by_email(email=client.email)
     if db_client:
         raise HTTPException(status_code=400, detail="Email already registered")
-    return await crud.client.create_client(client=client)
+    return await crud.client.create_client(client_data=client.dict())
 
 @router.get("/", response_model=List[schemas.Client])
 async def read_clients(skip: int = 0, limit: int = 100, current_user: UserModel = Depends(get_current_user)):
     try:
-        print(f"DEBUG: accessing read_clients. User: {current_user.email}, Skip: {skip}, Limit: {limit}")
+        logger.debug(f"accessing read_clients. User: {current_user.email}, Skip: {skip}, Limit: {limit}")
         clients = await crud.client.get_clients(skip=skip, limit=limit)
-        print(f"DEBUG: retrieved {len(clients)} clients")
+        logger.debug(f"retrieved {len(clients)} clients")
         return clients
     except Exception as e:
-        print(f"ERROR in read_clients: {str(e)}")
+        logger.error(f"ERROR in read_clients: {str(e)}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
@@ -46,7 +48,7 @@ async def update_client(client_id: int, client_update: schemas.ClientUpdate, cur
     db_client = await crud.client.get_client(client_id=client_id)
     if db_client is None:
         raise HTTPException(status_code=404, detail="Client not found")
-    return await crud.client.update_client(client_id=client_id, client_update=client_update)
+    return await crud.client.update_client(client_id=client_id, client_update=client_update.dict(exclude_unset=True))
 
 @router.delete("/{client_id}", response_model=schemas.Client)
 async def delete_client(client_id: int, current_user: UserModel = Depends(get_current_user)):

@@ -1,11 +1,11 @@
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from datetime import datetime
 
 
 class UserBase(BaseModel):
     name: str
-    email: str
+    email: EmailStr
     phone: Optional[str] = None
     role: str = "user"  # admin, manager, receptionist, user, super_admin
 
@@ -16,7 +16,7 @@ class UserCreate(UserBase):
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
-    email: Optional[str] = None
+    email: Optional[EmailStr] = None
     phone: Optional[str] = None
     role: Optional[str] = None
     password: Optional[str] = None

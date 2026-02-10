@@ -5,6 +5,7 @@ from typing import Optional, List, Tuple
 import os
 
 from app.models.facial_encoding import FacialEncoding
+from app.utils.logging import logger
 
 class FacialRecognitionService:
     def __init__(self):
@@ -34,18 +35,18 @@ class FacialRecognitionService:
         # This prevents hands, silhouettes, or non-face objects from being processed.
         detection_results = self.face_detection.process(rgb_image)
         if not detection_results.detections:
-            print("DEBUG Security: No legitimate face detected (REJECTED)")
+            logger.debug("Security: No legitimate face detected (REJECTED)")
             return None
             
         face_conf = detection_results.detections[0].score[0]
         if face_conf < 0.85:
-            print(f"DEBUG Security: Face detection confidence too low ({face_conf:.2f}), REJECTED.")
+            logger.debug(f"Security: Face detection confidence too low ({face_conf:.2f}), REJECTED.")
             return None
 
         # --- Stage 2: Face Mesh Landmark Extraction ---
         mesh_results = self.face_mesh.process(rgb_image)
         if not mesh_results.multi_face_landmarks:
-            print("DEBUG Security: FaceMesh failed to acquire biometric map.")
+            logger.debug("Security: FaceMesh failed to acquire biometric map.")
             return None
 
         face_landmarks = mesh_results.multi_face_landmarks[0]
@@ -140,9 +141,9 @@ class FacialRecognitionService:
                     best_match_id = known_client_ids[i]
 
         if best_match_id:
-            print(f"DEBUG FaceMatch: SECURE MATCH! ID {best_match_id} | Dist {min_dist:.4f}")
+            logger.debug(f"FaceMatch: SECURE MATCH! ID {best_match_id} | Dist {min_dist:.4f}")
         else:
-            print(f"DEBUG FaceMatch: NO MATCH. Strict-Closest: {closest_dist:.4f}")
+            logger.debug(f"FaceMatch: NO MATCH. Strict-Closest: {closest_dist:.4f}")
 
         return best_match_id
 
@@ -159,5 +160,5 @@ class FacialRecognitionService:
             encoding_data=features.tobytes()
         )
         
-        print(f"DEBUG Register: Aligned biometric enrollment complete for client {client_id}")
+        logger.info(f"Register: Aligned biometric enrollment complete for client {client_id}")
         return True

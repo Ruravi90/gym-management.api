@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 from app import crud, models, schemas
 from app.utils.auth import get_current_user
-from app.database import get_db
+
 
 from app.models.user import User as UserModel
 
@@ -20,7 +20,7 @@ async def create_user(user: schemas.UserCreate, current_user: UserModel = Depend
     db_user = await crud.user.get_user_by_email(email=user.email)
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
-    return await crud.user.create_user(user=user)
+    return await crud.user.create_user(user_data=user.dict())
 
 
 @router.get("/", response_model=List[schemas.User])

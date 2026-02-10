@@ -23,9 +23,6 @@ class User(Model):
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
     
-    # Relationships
-    memberships: fields.ReverseRelation["Membership"]
-    
     class Meta:
         table = "users"
         indexes = [("email",), ("role",), ("created_at",)]

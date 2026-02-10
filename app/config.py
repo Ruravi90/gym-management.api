@@ -1,4 +1,5 @@
 import os
+import warnings
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
@@ -24,6 +25,13 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "*")
 
 settings = Settings()
+
+# Warn if using default secret key
+if settings.SECRET_KEY == "your-secret-key-123-change-in-production":
+    if settings.ENVIRONMENT == "production":
+        raise RuntimeError("SECRET_KEY must be set in production! Set the SECRET_KEY environment variable.")
+    else:
+        warnings.warn("Using default SECRET_KEY. Set SECRET_KEY env var for production.", stacklevel=2)
 
 # Configuration for Tortoise ORM with optimizations
 TORTOISE_CONFIG = {

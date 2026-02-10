@@ -1,5 +1,5 @@
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from app.models.attendance import Attendance
 from app.models.client import Client
 from tortoise.exceptions import DoesNotExist
@@ -67,6 +67,6 @@ async def check_out_client(attendance_id: int) -> Optional[Attendance]:
     """Record a client's check-out"""
     attendance = await get_attendance(attendance_id)
     if attendance:
-        attendance.check_out_time = datetime.utcnow()
+        attendance.check_out_time = datetime.now(timezone.utc)
         await attendance.save()
     return attendance

@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from typing import List
-from datetime import datetime
+from datetime import datetime, timezone
 from app import crud, schemas, models
 from app.middleware.security import limiter, file_upload_limits
 from app.services.facial_recognition import FacialRecognitionService
-from app.database import get_db
+
 
 router = APIRouter()
 
@@ -36,13 +36,13 @@ async def check_in(request: Request, file: UploadFile = File(...)):
 
     if last_attendance and last_attendance.check_out is None:
         # Check out
-        attendance = await crud.attendance.update_attendance_checkout(last_attendance.id, datetime.utcnow())
+        attendance = await crud.attendance.update_attendance_checkout(last_attendance.id, datetime.now(timezone.utc))
     else:
         # Check in
         attendance_create = schemas.AttendanceCreate(
             client_id=client_id,
-            check_in=datetime.utcnow(),
-            date=datetime.utcnow()
+            check_in=datetime.now(timezone.utc),
+            date=datetime.now(timezone.utc)
         )
         attendance = await crud.attendance.create_attendance(attendance=attendance_create)
 
@@ -58,13 +58,13 @@ async def check_in_manual(client_id: int):
 
     if last_attendance and last_attendance.check_out is None:
         # Check out
-        attendance = await crud.attendance.update_attendance_checkout(last_attendance.id, datetime.utcnow())
+        attendance = await crud.attendance.update_attendance_checkout(last_attendance.id, datetime.now(timezone.utc))
     else:
         # Check in
         attendance_create = schemas.AttendanceCreate(
             client_id=client_id,
-            check_in=datetime.utcnow(),
-            date=datetime.utcnow()
+            check_in=datetime.now(timezone.utc),
+            date=datetime.now(timezone.utc)
         )
         attendance = await crud.attendance.create_attendance(attendance=attendance_create)
 

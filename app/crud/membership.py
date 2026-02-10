@@ -1,5 +1,5 @@
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from app.models.membership import Membership, MembershipType
 from app.models.client import Client
 from tortoise.exceptions import DoesNotExist
@@ -72,7 +72,7 @@ async def get_active_membership(client_id: int) -> Optional[Membership]:
     return await Membership.filter(
         client_id=client_id,
         status="active",
-        end_date__gte=datetime.utcnow()
+        end_date__gte=datetime.now(timezone.utc)
     ).order_by("-end_date").first()
 
 
@@ -84,7 +84,7 @@ async def create_membership(membership_data: dict) -> Membership:
         membership_type = await get_membership_type(membership_data['membership_type_id'])
     
     # Calculate end_date if not provided and membership type exists
-    start_date = membership_data.get('start_date') or datetime.utcnow()
+    start_date = membership_data.get('start_date') or datetime.now(timezone.utc)
     end_date = membership_data.get('end_date')
     
     if membership_type and not end_date:
@@ -126,7 +126,7 @@ async def delete_membership(membership_id: int) -> Optional[Membership]:
 async def get_expired_memberships() -> List[Membership]:
     """Get all expired memberships"""
     return await Membership.filter(
-        Q(status="expired") | Q(end_date__lt=datetime.utcnow())
+        Q(status="expired") | Q(end_date__lt=datetime.now(timezone.utc))
     )
 
 
@@ -149,23 +149,23 @@ async def get_active_memberships_count() -> int:
     """Get the count of active memberships"""
     return await Membership.filter(
         status="active",
-        end_date__gte=datetime.utcnow()
+        end_date__gte=datetime.now(timezone.utc)
     ).count()
 
 
 async def get_expired_memberships_count() -> int:
     """Get the count of expired memberships"""
     return await Membership.filter(
-        Q(status="expired") | Q(end_date__lt=datetime.utcnow())
+        Q(status="expired") | Q(end_date__lt=datetime.now(timezone.utc))
     ).count()
 
 
 async def get_upcoming_expirations(days: int = 30) -> List[Membership]:
     """Get memberships that will expire within the specified number of days"""
-    future_date = datetime.utcnow() + timedelta(days=days)
+    future_date = datetime.now(timezone.utc) + timedelta(days=days)
     return await Membership.filter(
         status="active",
-        end_date__gte=datetime.utcnow(),
+        end_date__gte=datetime.now(timezone.utc),
         end_date__lte=future_date
     ).order_by("end_date")
 
@@ -222,7 +222,7 @@ async def validate_membership_access(client_id: int) -> dict:
                 }
     
     # Check if the membership hasn't expired
-    if active_membership.end_date < datetime.utcnow():
+    if active_membership.end_date < datetime.now(timezone.utc):
         return {
             "valid_access": False,
             "message": "Membership has expired"

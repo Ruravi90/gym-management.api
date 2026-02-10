@@ -1,8 +1,6 @@
 from tortoise.models import Model
 from tortoise import fields
 from datetime import datetime
-from .user import User
-from .client import Client
 
 
 class MembershipType(Model):
@@ -29,8 +27,10 @@ class MembershipType(Model):
 
 class Membership(Model):
     id = fields.IntField(pk=True)
-    client_id = fields.IntField()  # Foreign key reference (using IntField instead of ForeignKeyField for simplicity)
-    membership_type_id = fields.IntField(null=True)  # Reference to type (can be null for legacy memberships)
+    client = fields.ForeignKeyField("models.Client", related_name="memberships", on_delete=fields.CASCADE)
+    membership_type = fields.ForeignKeyField(
+        "models.MembershipType", related_name="memberships", null=True, on_delete=fields.SET_NULL
+    )
     type = fields.CharField(max_length=50, default="basic")  # Kept for backward compatibility during migration
     start_date = fields.DatetimeField(auto_now_add=True)
     end_date = fields.DatetimeField()
@@ -44,13 +44,9 @@ class Membership(Model):
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
     
-    # Relationships (using reverse relations since we're using IntField)
-    membership_type: fields.ReverseRelation["MembershipType"]
-    client: fields.ReverseRelation["Client"]
-    
     class Meta:
         table = "memberships"
-        indexes = [("client_id",), ("status",), ("payment_status",), ("start_date",), ("end_date",)]
+        indexes = [("status",), ("payment_status",), ("start_date",), ("end_date",)]
     
     def __str__(self):
         return f"{self.client_id} - {self.type}"

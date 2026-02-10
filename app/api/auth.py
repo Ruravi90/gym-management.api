@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 from app import crud, schemas
 from app.utils.auth import authenticate_user, create_access_token
 from app.config import settings
 from app.middleware.security import limiter, auth_limits
-from app.database import get_db
+
 
 router = APIRouter()
 
@@ -36,7 +36,7 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
     )
 
     # Calculate expiration time
-    expires_at = datetime.utcnow() + access_token_expires
+    expires_at = datetime.now(timezone.utc) + access_token_expires
 
     return {
         "access_token": access_token,
@@ -59,13 +59,12 @@ async def register(request: Request, user_data: schemas.UserRegister):
         )
 
     # Create user with hashed password
-    user_create = schemas.UserCreate(
-        email=user_data.email,
-        name=user_data.name,
-        phone=user_data.phone,
-        membership_type=user_data.membership_type,
-        password=user_data.password
-    )
+    user_dict = {
+        "email": user_data.email,
+        "name": user_data.name,
+        "phone": user_data.phone,
+        "password": user_data.password
+    }
 
-    user = await crud.user.create_user(user=user_create)
+    user = await crud.user.create_user(user_data=user_dict)
     return user

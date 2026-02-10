@@ -2,37 +2,21 @@
 """
 Simple seeder script for initial data
 """
-import bcrypt
-
-# Fix for passlib compatibility with bcrypt 4.0+
-if not hasattr(bcrypt, "__about__"):
-    bcrypt.__about__ = type("About", (object,), {"__version__": bcrypt.__version__})
-
-# Fix for ValueError: password cannot be longer than 72 bytes
-_original_hashpw = bcrypt.hashpw
-def _patched_hashpw(password, salt):
-    if isinstance(password, str):
-        password_bytes = password.encode('utf-8')
-    else:
-        password_bytes = password
-    # Bcrypt algorithm maximum password length is 72 bytes
-    if len(password_bytes) > 72:
-        password_bytes = password_bytes[:72]
-    return _original_hashpw(password_bytes, salt)
-
-bcrypt.hashpw = _patched_hashpw
-
-import asyncio
 import sys
 import os
+
+# Add the project root to the Python path (must be before app imports)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+
+import app.utils.bcrypt_compat  # noqa: F401 — must be imported first for passlib/bcrypt compatibility
+
+import asyncio
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
 
-# Add the project root to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
-
 from app.config import TORTOISE_CONFIG
 from tortoise import Tortoise
+from app.utils.logging import logger
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -52,44 +36,51 @@ async def init_db():
 
 async def seed_super_admin():
     """Seed the database with a super admin user."""
-    print("Seeding super admin...")
+    logger.info("Seeding super admin...")
 
     # Import models inside the function to ensure they're available after DB initialization
     from app.models.user import User, UserRoleEnum
 
+    # Read credentials from environment variables
+    super_admin_email = os.environ.get("SEED_SUPER_ADMIN_EMAIL", "ruravi@icloud.com")
+    super_admin_name = os.environ.get("SEED_SUPER_ADMIN_NAME", "Ruravi Aguilar")
+    super_admin_phone = os.environ.get("SEED_SUPER_ADMIN_PHONE", "3317242995")
+    super_admin_pass = os.environ.get("SEED_SUPER_ADMIN_PASSWORD", "SecurePass123")
+
+    admin_email = os.environ.get("SEED_ADMIN_EMAIL", "oscar@pantherwarriors.com")
+    admin_name = os.environ.get("SEED_ADMIN_NAME", "Oscar Panther")
+    admin_phone = os.environ.get("SEED_ADMIN_PHONE", "3317242995")
+    admin_pass = os.environ.get("SEED_ADMIN_PASSWORD", "Oscar2025")
+
     # Check if super admin already exists
-    existing_admin = await User.filter(email="ruravi@icloud.com").first()
+    existing_admin = await User.filter(email=super_admin_email).first()
     if not existing_admin:
-        # Create super admin user
         super_admin = await User.create(
-            name="Ruravi Aguilar",
-            email="ruravi@icloud.com",
-            phone="3317242995",
+            name=super_admin_name,
+            email=super_admin_email,
+            phone=super_admin_phone,
             role=UserRoleEnum.SUPER_ADMIN,
-            hashed_password=hash_password("SecurePass123"),  # Use a strong default password
+            hashed_password=hash_password(super_admin_pass),
             status=True
         )
+        logger.info(f"Super admin user created with ID: {super_admin.id}")
 
-        print(f"Super admin user created with ID: {super_admin.id}")
-
-    existing_admin = await User.filter(email="oscar@pantherwarriors.com").first()
+    existing_admin = await User.filter(email=admin_email).first()
     if not existing_admin:
-        # Create super admin user
         admin = await User.create(
-            name="Oscar Panther",
-            email="oscar@pantherwarriors.com",
-            phone="3317242995",
+            name=admin_name,
+            email=admin_email,
+            phone=admin_phone,
             role=UserRoleEnum.ADMIN,
-            hashed_password=hash_password("Oscar2025"),  # Use a strong default password
+            hashed_password=hash_password(admin_pass),
             status=True
         )
-
-        print(f"Admin user created with ID: {admin.id}")
+        logger.info(f"Admin user created with ID: {admin.id}")
 
 
 async def seed_membership_types():
     """Seed the database with default membership types."""
-    print("Seeding membership types...")
+    logger.info("Seeding membership types...")
 
     from app.models.membership import MembershipType
 
@@ -169,23 +160,23 @@ async def seed_membership_types():
         }
     ]
 
-    print("Seeding default membership types...")
+    logger.info("Seeding default membership types...")
     for membership_data in default_memberships:
         # Check if membership type already exists
         existing_type = await MembershipType.filter(name=membership_data['name']).first()
         if existing_type:
-            print(f"Membership type '{membership_data['name']}' already exists, skipping.")
+            logger.info(f"Membership type '{membership_data['name']}' already exists, skipping.")
             continue
 
         membership_type = await MembershipType.create(**membership_data)
-        print(f"Created membership type: {membership_type.name}")
+        logger.info(f"Created membership type: {membership_type.name}")
 
-    print(f"Seeded {len(default_memberships)} membership types")
+    logger.info(f"Seeded {len(default_memberships)} membership types")
 
 
 async def seed_sample_clients():
     """Seed the database with sample clients."""
-    print("Seeding sample clients...")
+    logger.info("Seeding sample clients...")
     
     from app.models.client import Client
 
@@ -231,19 +222,19 @@ async def seed_sample_clients():
         # Check if client already exists
         existing_client = await Client.filter(email=client_data['email']).first()
         if existing_client:
-            print(f"Client '{client_data['name']}' already exists, skipping.")
+            logger.info(f"Client '{client_data['name']}' already exists, skipping.")
             continue
 
         client = await Client.create(**client_data)
-        print(f"Created client: {client.name}")
+        logger.info(f"Created client: {client.name}")
 
-    print(f"Seeded {len(sample_clients)} sample clients")
+    logger.info(f"Seeded {len(sample_clients)} sample clients")
 
 
 async def run_seeders():
     """Run all seeders to populate the database with initial data."""
     try:
-        print("Starting database seeding process...")
+        logger.info("Starting database seeding process...")
 
         # Seed super admin first
         await seed_super_admin()
@@ -251,15 +242,13 @@ async def run_seeders():
         # Seed membership types
         await seed_membership_types()
 
-        print("Database seeding completed successfully!")
+        logger.info("Database seeding completed successfully!")
 
     except Exception as e:
-        print(f"Error during seeding: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.exception(f"Error during seeding: {str(e)}")
 
 
 if __name__ == "__main__":
-    print("Running seeders...")
+    logger.info("Running seeders...")
     asyncio.run(run_seeders())
-    print("Seeders completed!")
+    logger.info("Seeders completed!")

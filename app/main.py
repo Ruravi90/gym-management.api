@@ -1,29 +1,16 @@
-import bcrypt
+import app.utils.bcrypt_compat  # noqa: F401 — must be imported first for passlib/bcrypt compatibility
 
-# Fix for passlib compatibility with bcrypt 4.0+
-if not hasattr(bcrypt, "__about__"):
-    bcrypt.__about__ = type("About", (object,), {"__version__": bcrypt.__version__})
-
-# Fix for ValueError: password cannot be longer than 72 bytes
-_original_hashpw = bcrypt.hashpw
-def _patched_hashpw(password, salt):
-    if isinstance(password, str):
-        password_bytes = password.encode('utf-8')
-    else:
-        password_bytes = password
-    # Bcrypt algorithm maximum password length is 72 bytes
-    if len(password_bytes) > 72:
-        password_bytes = password_bytes[:72]
-    return _original_hashpw(password_bytes, salt)
-
-bcrypt.hashpw = _patched_hashpw
 
 from fastapi import FastAPI, Depends, HTTPException, Request
 from app.config import settings
+from app.utils.logging import setup_logging
 import asyncio
 from aerich import Command
 
-from app.api import users, memberships, attendance, membership_types
+# Initialize logging
+logger = setup_logging()
+
+from app.api import users, memberships, attendance, membership_types, gym_class
 from app.api.clients import router as clients_router
 from app.api.facial_recognition import router as facial_recognition_router
 from app.api.auth import router as auth_router
@@ -65,6 +52,7 @@ app.include_router(clients_router, prefix="/clients", tags=["clients"])
 app.include_router(memberships.router, prefix="/memberships", tags=["memberships"])
 app.include_router(membership_types.router, prefix="/membership-types", tags=["membership-types"])
 app.include_router(attendance.router, prefix="/attendance", tags=["attendance"])
+app.include_router(gym_class.router, prefix="/classes", tags=["classes"])
 app.include_router(facial_recognition_router, prefix="/facial-recognition", tags=["facial-recognition"])
 
 from tortoise.contrib.fastapi import register_tortoise
@@ -92,32 +80,31 @@ async def startup_event():
             return
         seeders_executed = True
     
-    print("✅ Database schema initialized at startup via Tortoise ORM")
+    logger.info("✅ Database schema initialized at startup via Tortoise ORM")
 
     # Run migrations using Aerich
     try:
         command = Command(tortoise_config=TORTOISE_CONFIG, app="models")
         await command.init()
         await command.upgrade(run_in_transaction=True)
-        print("✅ Migrations applied successfully")
+        logger.info("✅ Migrations applied successfully")
     except Exception as e:
-        print(f"❌ Error applying migrations: {str(e)}")
+        logger.error(f"❌ Error applying migrations: {str(e)}")
 
     # Import and run seeders after database initialization
     try:
         from app.seeders.seed_data import seed_super_admin, seed_membership_types
-        print("🌱 Starting database seeding process...")
+        logger.info("🌱 Starting database seeding process...")
 
         # Run individual seeders
         await seed_super_admin()
         await seed_membership_types()
 
-        print("✅ Database seeding completed at startup!")
+        logger.info("✅ Database seeding completed at startup!")
     except Exception as e:
-        print(f"⚠️  Warning: Could not run seeders: {str(e)}")
-        print("💡 This may be due to database connection timing. Server will continue to start.")
-        import traceback
-        traceback.print_exc()
+        logger.warning(f"⚠️  Warning: Could not run seeders: {str(e)}")
+        logger.info("💡 This may be due to database connection timing. Server will continue to start.")
+        logger.exception("Seeder failure details:")
 
 @app.get("/")
 @limiter.limit(common_limits)

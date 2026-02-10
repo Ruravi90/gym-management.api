@@ -13,9 +13,9 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     user_id: Optional[int] = None
-    email: Optional[str] = None
+    email: Optional[EmailStr] = None
 
 class UserRegister(UserLogin):
     name: str
     phone: Optional[str] = None
-    membership_type: Optional[str] = "basic"
+

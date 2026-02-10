@@ -55,3 +55,13 @@ async def get_clients_by_membership_type(membership_type: str) -> List[Client]:
 async def get_active_clients() -> List[Client]:
     """Get all active clients"""
     return await Client.filter(status=True)
+
+
+async def search_clients(search_term: str, skip: int = 0, limit: int = 100) -> List[Client]:
+    """Search clients by name, email, or phone"""
+    from tortoise.expressions import Q
+    return await Client.filter(
+        Q(name__icontains=search_term) |
+        Q(email__icontains=search_term) |
+        Q(phone__icontains=search_term)
+    ).offset(skip).limit(limit)

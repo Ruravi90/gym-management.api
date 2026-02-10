@@ -1,11 +1,11 @@
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from datetime import datetime
 
 
 class ClientBase(BaseModel):
     name: str
-    email: str
+    email: EmailStr
     phone: Optional[str] = None
     membership_type: Optional[str] = None  # basic, premium, vip
     status: bool = True
@@ -17,7 +17,7 @@ class ClientCreate(ClientBase):
 
 class ClientUpdate(BaseModel):
     name: Optional[str] = None
-    email: Optional[str] = None
+    email: Optional[EmailStr] = None
     phone: Optional[str] = None
     membership_type: Optional[str] = None
     status: Optional[bool] = None
