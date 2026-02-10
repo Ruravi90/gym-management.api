@@ -22,11 +22,6 @@ def upgrade() -> None:
     """Upgrade schema."""
     # Add updated_at column to users table
     op.add_column('users', sa.Column('updated_at', sa.DateTime(), nullable=True))
-    
-    # Update existing records to have a default updated_at value
-    connection = op.get_bind()
-    connection.execute(sa.text("UPDATE users SET updated_at = created_at WHERE updated_at IS NULL"))
-
 
 def downgrade() -> None:
     """Downgrade schema."""

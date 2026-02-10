@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from sqlalchemy.orm import Session
 from typing import List
 from app import crud, schemas
@@ -69,9 +69,11 @@ def read_membership_statistics(
         "upcoming_expirations_list": upcoming_expirations
     }
 
+from fastapi import Path
+
 @router.get("/{membership_id}", response_model=schemas.Membership)
 def read_membership(
-    membership_id: int,
+    membership_id: int = Path(..., ge=1),  # Ensure membership_id is greater than or equal to 1
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -222,7 +224,87 @@ def read_membership_history(
     client = crud.client.get_client(db, client_id=client_id)
     if not client:
          raise HTTPException(status_code=404, detail="Client not found")
-    
+
     # Get all memberships for the client (past and present)
     memberships = crud.membership.get_memberships_by_client(db, client_id=client_id)
     return memberships
+
+
+# Enhanced membership endpoints
+@router.post("/{membership_id}/use-access", response_model=schemas.Membership)
+def use_membership_access(
+    membership_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Increment the access counter for punch-based memberships.
+    Only authorized users can log access usage.
+    """
+    if current_user.role not in ["admin", "manager", "receptionist", "super_admin"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to log access usage"
+        )
+
+    db_membership = crud.membership.get_membership(db, membership_id=membership_id)
+    if db_membership is None:
+        raise HTTPException(status_code=404, detail="Membership not found")
+
+    # Check if it's a punch-based membership
+    if not db_membership.membership_type or db_membership.membership_type.accesses_allowed is None:
+        raise HTTPException(
+            status_code=400,
+            detail="This endpoint is only for punch-based memberships"
+        )
+
+    # Check if access limit has been reached
+    if db_membership.accesses_used >= db_membership.membership_type.accesses_allowed:
+        raise HTTPException(
+            status_code=400,
+            detail="Access limit already reached for this membership"
+        )
+
+    return crud.membership.increment_access_count(db=db, membership_id=membership_id)
+
+
+@router.get("/{membership_id}/access-usage", response_model=schemas.PunchUsage)
+def get_membership_access_usage(
+    membership_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get access usage statistics for a membership.
+    Only authorized users can view access usage.
+    """
+    if current_user.role not in ["admin", "manager", "receptionist", "super_admin"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to view access usage"
+        )
+
+    usage = crud.membership.get_punch_usage(db, membership_id=membership_id)
+    if usage is None:
+        raise HTTPException(status_code=404, detail="Membership or membership type not found")
+
+    return usage
+
+
+@router.get("/validate-access/{client_id}", response_model=dict)
+def validate_client_access(
+    client_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Validate if a client has valid access rights.
+    Only authorized users can validate access.
+    """
+    if current_user.role not in ["admin", "manager", "receptionist", "super_admin"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to validate access"
+        )
+
+    return crud.membership.validate_membership_access(db=db, client_id=client_id)

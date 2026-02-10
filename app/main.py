@@ -5,6 +5,7 @@ from app import models
 from app.config import settings
 
 from app.api import users, memberships, attendance
+from app.api.membership_types import router as membership_types_router
 from app.api.clients import router as clients_router
 from app.api.facial_recognition import router as facial_recognition_router
 from app.api.auth import router as auth_router
@@ -45,6 +46,7 @@ app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(users.router, prefix="/users", tags=["users"])
 app.include_router(clients_router, prefix="/clients", tags=["clients"])
 app.include_router(memberships.router, prefix="/memberships", tags=["memberships"])
+app.include_router(membership_types_router, prefix="/membership-types", tags=["membership-types"])
 app.include_router(attendance.router, prefix="/attendance", tags=["attendance"])
 app.include_router(facial_recognition_router, prefix="/facial-recognition", tags=["facial-recognition"])
 
