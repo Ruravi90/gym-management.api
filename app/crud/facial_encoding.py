@@ -1,37 +1,27 @@
-from sqlalchemy.orm import Session
+from typing import Optional
 from ..models.facial_encoding import FacialEncoding
-from ..schemas.facial_encoding import FacialEncodingCreate
 
-def get_facial_encoding_by_client(db: Session, client_id: int):
+async def get_facial_encoding_by_client(client_id: int) -> Optional[FacialEncoding]:
     """Get facial encoding for a specific client"""
-    return db.query(FacialEncoding).filter(FacialEncoding.client_id == client_id).first()
+    return await FacialEncoding.filter(client_id=client_id).first()
 
-def create_facial_encoding(db: Session, facial_encoding: FacialEncodingCreate, encoding_data: bytes):
+async def create_facial_encoding(client_id: int, encoding_data: bytes) -> FacialEncoding:
     """Create a new facial encoding"""
-    db_facial_encoding = FacialEncoding(
-        client_id=facial_encoding.client_id,
+    return await FacialEncoding.create(
+        client_id=client_id,
         encoding_data=encoding_data
     )
-    db.add(db_facial_encoding)
-    db.commit()
-    db.refresh(db_facial_encoding)
-    return db_facial_encoding
 
-def update_facial_encoding(db: Session, client_id: int, encoding_data: bytes):
+async def update_facial_encoding(client_id: int, encoding_data: bytes) -> Optional[FacialEncoding]:
     """Update facial encoding for a client"""
-    db_facial_encoding = get_facial_encoding_by_client(db, client_id)
+    db_facial_encoding = await get_facial_encoding_by_client(client_id)
     if db_facial_encoding:
         db_facial_encoding.encoding_data = encoding_data
-        db.commit()
-        db.refresh(db_facial_encoding)
+        await db_facial_encoding.save()
         return db_facial_encoding
     return None
 
-def delete_facial_encoding(db: Session, client_id: int):
+async def delete_facial_encoding(client_id: int) -> bool:
     """Delete facial encoding for a client"""
-    db_facial_encoding = get_facial_encoding_by_client(db, client_id)
-    if db_facial_encoding:
-        db.delete(db_facial_encoding)
-        db.commit()
-        return db_facial_encoding
-    return None
+    count = await FacialEncoding.filter(client_id=client_id).delete()
+    return count > 0

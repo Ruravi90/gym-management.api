@@ -1,7 +1,6 @@
 import cv2
 import mediapipe as mp
 import numpy as np
-from sqlalchemy.orm import Session
 from typing import Optional, List, Tuple
 import os
 
@@ -94,9 +93,9 @@ class FacialRecognitionService:
             return None
         return self.extract_face_features(image)
 
-    def load_known_encodings(self, db: Session) -> Tuple[List[np.ndarray], List[int]]:
+    async def load_known_encodings(self) -> Tuple[List[np.ndarray], List[int]]:
         """Load and decode biometric database."""
-        encodings_db = db.query(FacialEncoding).all()
+        encodings_db = await FacialEncoding.all()
         known_encodings = []
         known_client_ids = []
         
@@ -107,7 +106,7 @@ class FacialRecognitionService:
             
         return known_encodings, known_client_ids
 
-    def identify_client(self, file_content: bytes, db: Session) -> Optional[int]:
+    async def identify_client(self, file_content: bytes) -> Optional[int]:
         """
         Identify client with High Sensitivity front-facing alignment.
         """
@@ -115,7 +114,7 @@ class FacialRecognitionService:
         if unknown_features is None:
             return None
 
-        known_encodings, known_client_ids = self.load_known_encodings(db)
+        known_encodings, known_client_ids = await self.load_known_encodings()
         if not known_encodings:
             return None
 
@@ -147,21 +146,18 @@ class FacialRecognitionService:
 
         return best_match_id
 
-    def register_face(self, db: Session, client_id: int, file_content: bytes):
+    async def register_face(self, client_id: int, file_content: bytes):
         """Register face with front-facing canonical alignment."""
         features = self.process_image(file_content)
         if features is None:
             raise ValueError("No se pudo detectar un rostro claro. Centra tu cara y mejora la luz.")
 
-        db.query(FacialEncoding).filter(FacialEncoding.client_id == client_id).delete()
+        await FacialEncoding.filter(client_id=client_id).delete()
         
-        db_encoding = FacialEncoding(
+        await FacialEncoding.create(
             client_id=client_id,
             encoding_data=features.tobytes()
         )
-        db.add(db_encoding)
-        db.commit()
-        db.refresh(db_encoding)
         
         print(f"DEBUG Register: Aligned biometric enrollment complete for client {client_id}")
         return True

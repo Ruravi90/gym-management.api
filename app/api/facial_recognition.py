@@ -3,7 +3,6 @@ from typing import List
 from app import crud, schemas
 from app.services.facial_recognition import FacialRecognitionService
 from app.middleware.security import limiter, file_upload_limits
-from app.database import get_db
 
 router = APIRouter()
 face_service = FacialRecognitionService()

@@ -1,8 +1,7 @@
 from functools import wraps
 from fastapi import Depends, HTTPException, status
-from sqlalchemy.orm import Session
 from app.utils.auth import get_current_user
-from models.user import User
+from app.models.user import User
 
 def require_role(required_roles=None):
     """
