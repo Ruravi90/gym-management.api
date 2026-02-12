@@ -70,3 +70,12 @@ async def check_out_client(attendance_id: int) -> Optional[Attendance]:
         attendance.check_out_time = datetime.now(timezone.utc)
         await attendance.save()
     return attendance
+
+
+async def update_attendance_checkout(attendance_id: int, check_out_time: datetime) -> Optional[Attendance]:
+    """Update an attendance record with check-out time"""
+    attendance = await get_attendance(attendance_id)
+    if attendance:
+        attendance.check_out_time = check_out_time
+        await attendance.save()
+    return attendance
