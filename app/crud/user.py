@@ -33,11 +33,22 @@ async def create_user(user_data: dict) -> User:
     return await User.create(**user_data)
 
 
-async def update_user(user_id: int, user_update: dict) -> Optional[User]:
+async def update_user(user_id: int, user_update) -> Optional[User]:
     """Update a user"""
     user = await get_user(user_id)
     if user:
-        for field, value in user_update.items():
+        # Convert pydantic model to dict if needed
+        if hasattr(user_update, 'model_dump'):
+            # Pydantic v2
+            update_data = user_update.model_dump(exclude_unset=True)
+        elif hasattr(user_update, 'dict'):
+            # Pydantic v1
+            update_data = user_update.dict(exclude_unset=True)
+        else:
+            # Already a dict
+            update_data = user_update
+
+        for field, value in update_data.items():
             if field == 'password':
                 setattr(user, 'hashed_password', hash_password(value))
             else:

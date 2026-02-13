@@ -110,8 +110,8 @@ class AuditService:
         # Exclude the 'id' field as it's already stored separately in the audit log
         values = {}
 
-        # Get the model's fields
-        for field_name in entity._meta.fields_map.keys():
+        # Get the model's fields - only use actual database fields to avoid QuerySets from relationships
+        for field_name in entity._meta.db_fields:
             if field_name != 'id':
                 try:
                     value = getattr(entity, field_name)

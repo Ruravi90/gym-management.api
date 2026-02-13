@@ -52,7 +52,19 @@ async def update_user(user_id: int, user_update: schemas.UserUpdate, current_use
     # Allow users to update their own profile, or administrative roles to update any user
     if current_user.id != user_id and current_user.role not in ADMIN_ROLES:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
-    db_user = await crud.user.update_user(user_id=user_id, user_update=user_update)
+
+    # Convert Pydantic model to dict for CRUD operations
+    if hasattr(user_update, 'model_dump'):
+        # Pydantic v2
+        user_update_dict = user_update.model_dump(exclude_unset=True)
+    elif hasattr(user_update, 'dict'):
+        # Pydantic v1
+        user_update_dict = user_update.dict(exclude_unset=True)
+    else:
+        # Already a dict
+        user_update_dict = user_update
+
+    db_user = await crud.user.update_user(user_id=user_id, user_update=user_update_dict)
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
     return db_user
