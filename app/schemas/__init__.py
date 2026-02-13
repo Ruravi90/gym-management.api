@@ -1,13 +1,15 @@
+print("Loading schemas __init__.py...")
 from .user import User, UserCreate, UserUpdate
 from .client import Client, ClientCreate, ClientUpdate
 from .membership import Membership, MembershipCreate, MembershipUpdate, MembershipStatistics, MembershipType, MembershipTypeCreate, MembershipTypeUpdate, PunchUsage
 from .attendance import Attendance, AttendanceCreate, AttendanceUpdate
 from .gym_class import GymClass, GymClassCreate, GymClassUpdate
 from .auth import UserLogin, Token, TokenData, UserRegister
+from .audit_log import AuditLog, AuditLogCreate, AuditLogUpdate, ActionTypeEnum
 
 __all__ = [
     "User",
-    "UserCreate", 
+    "UserCreate",
     "UserUpdate",
     "Client",
     "ClientCreate",
@@ -29,5 +31,9 @@ __all__ = [
     "UserLogin",
     "Token",
     "TokenData",
-    "UserRegister"
+    "UserRegister",
+    "AuditLog",
+    "AuditLogCreate",
+    "AuditLogUpdate",
+    "ActionTypeEnum"
 ]

@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 from app.models.attendance import Attendance
 from app.models.client import Client
 from tortoise.exceptions import DoesNotExist
+from app.services.audit_service import AuditService
+from app.models.audit_log import ActionTypeEnum
 
 
 async def get_attendance(attendance_id: int) -> Optional[Attendance]:
@@ -31,26 +33,86 @@ async def get_attendance_today() -> List[Attendance]:
     )
 
 
-async def create_attendance(attendance_data: dict) -> Attendance:
+async def create_attendance(
+    attendance_data: dict,
+    user_id: Optional[int] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None
+) -> Attendance:
     """Create a new attendance record"""
-    return await Attendance.create(**attendance_data)
+    attendance = await Attendance.create(**attendance_data)
 
+    # Log the creation in the audit log
+    await AuditService.log_creation(
+        user_id=user_id,
+        entity_type="Attendance",
+        entity_id=attendance.id,
+        new_values=await AuditService.extract_entity_values_for_audit(attendance),
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
 
-async def update_attendance(attendance_id: int, attendance_update: dict) -> Optional[Attendance]:
-    """Update an attendance record"""
-    attendance = await get_attendance(attendance_id)
-    if attendance:
-        for field, value in attendance_update.items():
-            setattr(attendance, field, value)
-        await attendance.save()
     return attendance
 
 
-async def delete_attendance(attendance_id: int) -> Optional[Attendance]:
+async def update_attendance(
+    attendance_id: int,
+    attendance_update: dict,
+    user_id: Optional[int] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None
+) -> Optional[Attendance]:
+    """Update an attendance record"""
+    attendance = await get_attendance(attendance_id)
+    if attendance:
+        # Get the old values before updating
+        old_values = await AuditService.extract_entity_values_for_audit(attendance)
+
+        # Update the attendance
+        for field, value in attendance_update.items():
+            setattr(attendance, field, value)
+        await attendance.save()
+
+        # Get the new values after updating
+        new_values = await AuditService.extract_entity_values_for_audit(attendance)
+
+        # Log the update in the audit log
+        await AuditService.log_update(
+            user_id=user_id,
+            entity_type="Attendance",
+            entity_id=attendance.id,
+            old_values=old_values,
+            new_values=new_values,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+
+    return attendance
+
+
+async def delete_attendance(
+    attendance_id: int,
+    user_id: Optional[int] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None
+) -> Optional[Attendance]:
     """Delete an attendance record"""
     attendance = await get_attendance(attendance_id)
     if attendance:
+        # Get the old values before deleting
+        old_values = await AuditService.extract_entity_values_for_audit(attendance)
+
         await attendance.delete()
+
+        # Log the deletion in the audit log
+        await AuditService.log_deletion(
+            user_id=user_id,
+            entity_type="Attendance",
+            entity_id=attendance.id,
+            old_values=old_values,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
     return attendance
 
 

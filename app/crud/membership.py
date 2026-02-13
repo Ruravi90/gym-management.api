@@ -4,6 +4,8 @@ from app.models.membership import Membership, MembershipType
 from app.models.client import Client
 from tortoise.exceptions import DoesNotExist
 from tortoise.expressions import Q
+from app.services.audit_service import AuditService
+from app.models.audit_log import ActionTypeEnum
 
 
 
@@ -24,27 +26,91 @@ async def get_membership_types(skip: int = 0, limit: int = 100, active_only: boo
     return await query.offset(skip).limit(limit)
 
 
-async def create_membership_type(membership_type_data: dict) -> MembershipType:
+async def create_membership_type(
+    membership_type_data: dict,
+    user_id: Optional[int] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None
+) -> MembershipType:
     """Create a new membership type"""
-    return await MembershipType.create(**membership_type_data)
+    membership_type = await MembershipType.create(**membership_type_data)
 
+    # Log the creation in the audit log
+    await AuditService.log_creation(
+        user_id=user_id,
+        entity_type="MembershipType",
+        entity_id=membership_type.id,
+        new_values=await AuditService.extract_entity_values_for_audit(membership_type),
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
 
-async def update_membership_type(membership_type_id: int, membership_type_update: dict) -> Optional[MembershipType]:
-    """Update a membership type"""
-    membership_type = await get_membership_type(membership_type_id)
-    if membership_type:
-        for field, value in membership_type_update.items():
-            setattr(membership_type, field, value)
-        await membership_type.save()
     return membership_type
 
 
-async def delete_membership_type(membership_type_id: int) -> Optional[MembershipType]:
+async def update_membership_type(
+    membership_type_id: int,
+    membership_type_update: dict,
+    user_id: Optional[int] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None
+) -> Optional[MembershipType]:
+    """Update a membership type"""
+    membership_type = await get_membership_type(membership_type_id)
+    if membership_type:
+        # Get the old values before updating
+        old_values = await AuditService.extract_entity_values_for_audit(membership_type)
+
+        # Update the membership type
+        for field, value in membership_type_update.items():
+            setattr(membership_type, field, value)
+        await membership_type.save()
+
+        # Get the new values after updating
+        new_values = await AuditService.extract_entity_values_for_audit(membership_type)
+
+        # Log the update in the audit log
+        await AuditService.log_update(
+            user_id=user_id,
+            entity_type="MembershipType",
+            entity_id=membership_type.id,
+            old_values=old_values,
+            new_values=new_values,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+
+    return membership_type
+
+
+async def delete_membership_type(
+    membership_type_id: int,
+    user_id: Optional[int] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None
+) -> Optional[MembershipType]:
     """Deactivate a membership type (soft delete)"""
     membership_type = await get_membership_type(membership_type_id)
     if membership_type:
+        # Get the old values before updating
+        old_values = await AuditService.extract_entity_values_for_audit(membership_type)
+
         membership_type.is_active = False
         await membership_type.save()
+
+        # Get the new values after updating
+        new_values = await AuditService.extract_entity_values_for_audit(membership_type)
+
+        # Log the update in the audit log (since we're not deleting, just deactivating)
+        await AuditService.log_update(
+            user_id=user_id,
+            entity_type="MembershipType",
+            entity_id=membership_type.id,
+            old_values=old_values,
+            new_values=new_values,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
     return membership_type
 
 
@@ -76,60 +142,120 @@ async def get_active_membership(client_id: int) -> Optional[Membership]:
     ).order_by("-end_date").first()
 
 
-async def create_membership(membership_data: dict) -> Membership:
+async def create_membership(
+    membership_data: dict,
+    user_id: Optional[int] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None
+) -> Membership:
     """Create a new membership with automatic date calculation based on membership type"""
     # If membership_type_id is provided, get the type to calculate dates
     membership_type = None
     if membership_data.get('membership_type_id'):
         membership_type = await get_membership_type(membership_data['membership_type_id'])
-    
+
     # Calculate end_date if not provided and membership type exists
     start_date = membership_data.get('start_date') or datetime.now(timezone.utc)
     end_date = membership_data.get('end_date')
-    
+
     if membership_type and not end_date:
         if membership_type.duration_days:
             end_date = start_date + timedelta(days=membership_type.duration_days)
         else:
             # Default to 30 days if no duration specified
             end_date = start_date + timedelta(days=30)
-    
+
     # Calculate price if not provided
     base_price = membership_data.get('price')
     if base_price is None and membership_type:
         base_price = membership_type.price
     elif base_price is None:
         base_price = 0.0
-        
+
     # Set price_paid to membership_type.price if not provided
     price_paid = membership_data.get('price_paid')
     if price_paid is None:
         price_paid = base_price
-    
+
     membership_data['start_date'] = start_date
     membership_data['end_date'] = end_date
     membership_data['price'] = base_price
     membership_data['price_paid'] = price_paid
     membership_data['type'] = membership_data.get('type') or (membership_type.name if membership_type else "General")
-    
-    return await Membership.create(**membership_data)
 
+    membership = await Membership.create(**membership_data)
 
-async def update_membership(membership_id: int, membership_update: dict) -> Optional[Membership]:
-    """Update a membership"""
-    membership = await get_membership(membership_id)
-    if membership:
-        for field, value in membership_update.items():
-            setattr(membership, field, value)
-        await membership.save()
+    # Log the creation in the audit log
+    await AuditService.log_creation(
+        user_id=user_id,
+        entity_type="Membership",
+        entity_id=membership.id,
+        new_values=await AuditService.extract_entity_values_for_audit(membership),
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
+
     return membership
 
 
-async def delete_membership(membership_id: int) -> Optional[Membership]:
+async def update_membership(
+    membership_id: int,
+    membership_update: dict,
+    user_id: Optional[int] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None
+) -> Optional[Membership]:
+    """Update a membership"""
+    membership = await get_membership(membership_id)
+    if membership:
+        # Get the old values before updating
+        old_values = await AuditService.extract_entity_values_for_audit(membership)
+
+        # Update the membership
+        for field, value in membership_update.items():
+            setattr(membership, field, value)
+        await membership.save()
+
+        # Get the new values after updating
+        new_values = await AuditService.extract_entity_values_for_audit(membership)
+
+        # Log the update in the audit log
+        await AuditService.log_update(
+            user_id=user_id,
+            entity_type="Membership",
+            entity_id=membership.id,
+            old_values=old_values,
+            new_values=new_values,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+
+    return membership
+
+
+async def delete_membership(
+    membership_id: int,
+    user_id: Optional[int] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None
+) -> Optional[Membership]:
     """Delete a membership"""
     membership = await get_membership(membership_id)
     if membership:
+        # Get the old values before deleting
+        old_values = await AuditService.extract_entity_values_for_audit(membership)
+
         await membership.delete()
+
+        # Log the deletion in the audit log
+        await AuditService.log_deletion(
+            user_id=user_id,
+            entity_type="Membership",
+            entity_id=membership.id,
+            old_values=old_values,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
     return membership
 
 

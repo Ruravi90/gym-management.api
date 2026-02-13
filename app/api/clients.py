@@ -16,7 +16,12 @@ async def create_client(client: schemas.ClientCreate, current_user: UserModel = 
     db_client = await crud.client.get_client_by_email(email=client.email)
     if db_client:
         raise HTTPException(status_code=400, detail="Email already registered")
-    return await crud.client.create_client(client_data=client.dict())
+    return await crud.client.create_client(
+        client_data=client.dict(),
+        user_id=current_user.id,
+        ip_address=None,  # Will be populated later with request info
+        user_agent=None   # Will be populated later with request info
+    )
 
 @router.get("/", response_model=List[schemas.Client])
 async def read_clients(skip: int = 0, limit: int = 100, current_user: UserModel = Depends(get_current_user)):
@@ -48,14 +53,25 @@ async def update_client(client_id: int, client_update: schemas.ClientUpdate, cur
     db_client = await crud.client.get_client(client_id=client_id)
     if db_client is None:
         raise HTTPException(status_code=404, detail="Client not found")
-    return await crud.client.update_client(client_id=client_id, client_update=client_update.dict(exclude_unset=True))
+    return await crud.client.update_client(
+        client_id=client_id,
+        client_update=client_update.dict(exclude_unset=True),
+        user_id=current_user.id,
+        ip_address=None,  # Will be populated later with request info
+        user_agent=None   # Will be populated later with request info
+    )
 
 @router.delete("/{client_id}", response_model=schemas.Client)
 async def delete_client(client_id: int, current_user: UserModel = Depends(get_current_user)):
     db_client = await crud.client.get_client(client_id=client_id)
     if db_client is None:
         raise HTTPException(status_code=404, detail="Client not found")
-    return await crud.client.delete_client(client_id=client_id)
+    return await crud.client.delete_client(
+        client_id=client_id,
+        user_id=current_user.id,
+        ip_address=None,  # Will be populated later with request info
+        user_agent=None   # Will be populated later with request info
+    )
 
 @router.post("/{client_id}/face")
 async def register_face(client_id: int, file: UploadFile = File(...), current_user: UserModel = Depends(get_current_user)):

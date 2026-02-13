@@ -40,7 +40,12 @@ async def create_membership(
 
 
     
-    return await crud.membership.create_membership(membership.dict())
+    return await crud.membership.create_membership(
+        membership.dict(),
+        user_id=current_user.id,
+        ip_address=None,  # Will be populated later with request info
+        user_agent=None   # Will be populated later with request info
+    )
 
 
 @router.get("/", response_model=List[schemas.Membership])
@@ -122,9 +127,11 @@ async def update_membership(
         )
 
     return await crud.membership.update_membership(
-
         membership_id=membership_id,
-        membership_update=membership_update.dict(exclude_unset=True)
+        membership_update=membership_update.dict(exclude_unset=True),
+        user_id=current_user.id,
+        ip_address=None,  # Will be populated later with request info
+        user_agent=None   # Will be populated later with request info
     )
 
 
@@ -144,7 +151,12 @@ async def delete_membership(
             detail="Only admin users can delete memberships"
         )
 
-    return await crud.membership.delete_membership(membership_id=membership_id)
+    return await crud.membership.delete_membership(
+        membership_id=membership_id,
+        user_id=current_user.id,
+        ip_address=None,  # Will be populated later with request info
+        user_agent=None   # Will be populated later with request info
+    )
 
 
 @router.get("/client/{client_id}", response_model=List[schemas.Membership])
@@ -273,7 +285,12 @@ async def create_membership_type(
             detail="Not authorized to create membership types"
         )
 
-    return await crud.membership.create_membership_type(membership_type.dict())
+    return await crud.membership.create_membership_type(
+        membership_type.dict(),
+        user_id=current_user.id,
+        ip_address=None,  # Will be populated later with request info
+        user_agent=None   # Will be populated later with request info
+    )
 
 
 @router.get("/types/{membership_type_id}", response_model=schemas.MembershipType)
@@ -320,7 +337,10 @@ async def update_membership_type(
 
     return await crud.membership.update_membership_type(
         membership_type_id=membership_type_id,
-        membership_type_update=membership_type_update.dict(exclude_unset=True)
+        membership_type_update=membership_type_update.dict(exclude_unset=True),
+        user_id=current_user.id,
+        ip_address=None,  # Will be populated later with request info
+        user_agent=None   # Will be populated later with request info
     )
 
 
@@ -343,7 +363,12 @@ async def delete_membership_type(
     if db_membership_type is None:
         raise HTTPException(status_code=404, detail="Membership type not found")
 
-    return await crud.membership.delete_membership_type(membership_type_id=membership_type_id)
+    return await crud.membership.delete_membership_type(
+        membership_type_id=membership_type_id,
+        user_id=current_user.id,
+        ip_address=None,  # Will be populated later with request info
+        user_agent=None   # Will be populated later with request info
+    )
 
 
 # Enhanced membership endpoints

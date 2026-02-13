@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from app import crud, schemas, models
 from app.middleware.security import limiter, file_upload_limits
 from app.services.facial_recognition import FacialRecognitionService
+from app.utils.auth import get_current_user
+from app.models.user import User as UserModel
 
 
 router = APIRouter()
@@ -11,12 +13,17 @@ router = APIRouter()
 face_service = FacialRecognitionService()
 
 @router.post("/", response_model=schemas.Attendance)
-async def create_attendance(attendance: schemas.AttendanceCreate):
+async def create_attendance(attendance: schemas.AttendanceCreate, current_user: UserModel = Depends(get_current_user)):
     # Verify client exists
     client = await crud.client.get_client(client_id=attendance.client_id)
     if not client:
          raise HTTPException(status_code=404, detail="Client not found")
-    return await crud.attendance.create_attendance(attendance.dict())
+    return await crud.attendance.create_attendance(
+        attendance.dict(),
+        user_id=current_user.id,
+        ip_address=None,  # Will be populated later with request info
+        user_agent=None   # Will be populated later with request info
+    )
 
 @router.get("/client/{client_id}", response_model=List[schemas.Attendance])
 async def read_attendances(client_id: int):
@@ -43,12 +50,18 @@ async def check_in(request: Request, file: UploadFile = File(...)):
             "client_id": client_id,
             "device_id": None  # Will be set by the model automatically
         }
-        attendance = await crud.attendance.create_attendance(attendance_data)
+        # For facial recognition, we'll use a system user or no user for audit logging
+        attendance = await crud.attendance.create_attendance(
+            attendance_data,
+            user_id=None,  # Facial recognition doesn't have a logged-in user
+            ip_address=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent")
+        )
 
     return attendance
 
 @router.post("/manual/{client_id}", response_model=schemas.Attendance)
-async def check_in_manual(client_id: int):
+async def check_in_manual(client_id: int, current_user: UserModel = Depends(get_current_user)):
     # Verify client exists
     client = await crud.client.get_client(client_id=client_id)
     if not client:
@@ -65,6 +78,11 @@ async def check_in_manual(client_id: int):
             "client_id": client_id,
             "device_id": None  # Will be set by the model automatically
         }
-        attendance = await crud.attendance.create_attendance(attendance_data)
+        attendance = await crud.attendance.create_attendance(
+            attendance_data,
+            user_id=current_user.id,
+            ip_address=None,  # Will be populated later with request info
+            user_agent=None   # Will be populated later with request info
+        )
 
     return attendance

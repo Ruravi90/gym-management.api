@@ -1,6 +1,8 @@
 from typing import List, Optional
 from app.models.client import Client
 from tortoise.exceptions import DoesNotExist
+from app.services.audit_service import AuditService
+from app.models.audit_log import ActionTypeEnum
 
 
 async def get_client(client_id: int) -> Optional[Client]:
@@ -24,26 +26,81 @@ async def get_clients(skip: int = 0, limit: int = 100) -> List[Client]:
     return await Client.all().offset(skip).limit(limit)
 
 
-async def create_client(client_data: dict) -> Client:
+async def create_client(client_data: dict, user_id: Optional[int] = None, ip_address: Optional[str] = None, user_agent: Optional[str] = None) -> Client:
     """Create a new client"""
-    return await Client.create(**client_data)
+    client = await Client.create(**client_data)
 
+    # Log the creation in the audit log
+    await AuditService.log_creation(
+        user_id=user_id,
+        entity_type="Client",
+        entity_id=client.id,
+        new_values=await AuditService.extract_entity_values_for_audit(client),
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
 
-async def update_client(client_id: int, client_update: dict) -> Optional[Client]:
-    """Update a client"""
-    client = await get_client(client_id)
-    if client:
-        for field, value in client_update.items():
-            setattr(client, field, value)
-        await client.save()
     return client
 
 
-async def delete_client(client_id: int) -> Optional[Client]:
+async def update_client(
+    client_id: int,
+    client_update: dict,
+    user_id: Optional[int] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None
+) -> Optional[Client]:
+    """Update a client"""
+    client = await get_client(client_id)
+    if client:
+        # Get the old values before updating
+        old_values = await AuditService.extract_entity_values_for_audit(client)
+
+        # Update the client
+        for field, value in client_update.items():
+            setattr(client, field, value)
+        await client.save()
+
+        # Get the new values after updating
+        new_values = await AuditService.extract_entity_values_for_audit(client)
+
+        # Log the update in the audit log
+        await AuditService.log_update(
+            user_id=user_id,
+            entity_type="Client",
+            entity_id=client.id,
+            old_values=old_values,
+            new_values=new_values,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+
+    return client
+
+
+async def delete_client(
+    client_id: int,
+    user_id: Optional[int] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None
+) -> Optional[Client]:
     """Delete a client"""
     client = await get_client(client_id)
     if client:
+        # Get the old values before deleting
+        old_values = await AuditService.extract_entity_values_for_audit(client)
+
         await client.delete()
+
+        # Log the deletion in the audit log
+        await AuditService.log_deletion(
+            user_id=user_id,
+            entity_type="Client",
+            entity_id=client.id,
+            old_values=old_values,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
     return client
 
 

@@ -14,6 +14,7 @@ from app.api import users, memberships, attendance, membership_types, gym_class
 from app.api.clients import router as clients_router
 from app.api.facial_recognition import router as facial_recognition_router
 from app.api.auth import router as auth_router
+from app.api.audit_logs import router as audit_logs_router
 from app.middleware.security import add_security_middleware, limiter, common_limits, auth_limits, file_upload_limits
 
 # Configure FastAPI app with metadata
@@ -46,14 +47,25 @@ app.add_middleware(
 )
 
 # Apply rate limiting to specific routes
+logger.info("Including auth router...")
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
+logger.info("Including users router...")
 app.include_router(users.router, prefix="/users", tags=["users"])
+logger.info("Including clients router...")
 app.include_router(clients_router, prefix="/clients", tags=["clients"])
+logger.info("Including memberships router...")
 app.include_router(memberships.router, prefix="/memberships", tags=["memberships"])
+logger.info("Including membership-types router...")
 app.include_router(membership_types.router, prefix="/membership-types", tags=["membership-types"])
+logger.info("Including attendance router...")
 app.include_router(attendance.router, prefix="/attendance", tags=["attendance"])
+logger.info("Including classes router...")
 app.include_router(gym_class.router, prefix="/classes", tags=["classes"])
+logger.info("Including facial-recognition router...")
 app.include_router(facial_recognition_router, prefix="/facial-recognition", tags=["facial-recognition"])
+logger.info("Including audit-logs router...")
+app.include_router(audit_logs_router, prefix="/audit-logs", tags=["audit-logs"])
+logger.info("All routers included successfully")
 
 from tortoise.contrib.fastapi import register_tortoise
 from app.config import TORTOISE_CONFIG
