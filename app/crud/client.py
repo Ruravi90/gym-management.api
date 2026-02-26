@@ -28,7 +28,9 @@ async def get_clients(skip: int = 0, limit: int = 100) -> List[Client]:
 
 async def create_client(client_data: dict, user_id: Optional[int] = None, ip_address: Optional[str] = None, user_agent: Optional[str] = None) -> Client:
     """Create a new client"""
-    client = await Client.create(**client_data)
+    # Extract user_id if provided in client_data
+    db_user_id = client_data.pop("user_id", None)
+    client = await Client.create(**client_data, user_id=db_user_id)
 
     # Log the creation in the audit log
     await AuditService.log_creation(

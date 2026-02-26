@@ -32,6 +32,7 @@ class ClientUpdate(BaseModel):
 
 class Client(ClientBase):
     id: int
+    user_id: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

@@ -66,7 +66,8 @@ logger.info("Including facial-recognition router...")
 app.include_router(facial_recognition_router, prefix="/facial-recognition", tags=["facial-recognition"])
 logger.info("Including audit-logs router...")
 app.include_router(audit_logs_router, prefix="/audit-logs", tags=["audit-logs"])
-app.include_router(analytics_router, prefix="/analytics", tags=["analytics"])
+from app.api.member import router as member_router
+app.include_router(member_router, prefix="/member", tags=["member"])
 logger.info("All routers included successfully")
 
 from tortoise.contrib.fastapi import register_tortoise
