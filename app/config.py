@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     MP_SUCCESS_URL: str = os.getenv("MP_SUCCESS_URL", "https://guerreros-panther.vercel.app/payment/success")
     MP_FAILURE_URL: str = os.getenv("MP_FAILURE_URL", "https://guerreros-panther.vercel.app/payment/failure")
     MP_PENDING_URL: str = os.getenv("MP_PENDING_URL", "https://guerreros-panther.vercel.app/payment/pending")
+    MP_WEBHOOK_SECRET: str = os.getenv("MP_WEBHOOK_SECRET", "super-secret-token-123")
 
 settings = Settings()
 

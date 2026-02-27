@@ -68,9 +68,10 @@ async def create_payment_preference(
                 "failure": settings.MP_FAILURE_URL,
                 "pending": settings.MP_PENDING_URL
             },
-            "auto_return": "all",
-            "notification_url": settings.MP_WEBHOOK_URL if settings.MP_WEBHOOK_URL else None,
-            "external_reference": str(membership.id)
+            "auto_return": "approved",
+            "notification_url": f"{settings.MP_WEBHOOK_URL}/{settings.MP_WEBHOOK_SECRET}" if settings.MP_WEBHOOK_URL and "localhost" not in settings.MP_WEBHOOK_URL else None,
+            "external_reference": str(membership.id),
+            "binary_mode": True # Force immediate success/failure
         }
 
         if not preference_body["notification_url"]:
@@ -102,11 +103,16 @@ async def create_payment_preference(
         logger.error(f"Error creating MP preference: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error creating payment preference: {str(e)}")
 
-@router.post("/webhook")
-async def mercadopago_webhook(request: Request):
+@router.post("/webhook/{secret}")
+async def mercadopago_webhook(secret: str, request: Request):
     """
     Handle Mercado Pago IPN/Webhook notifications.
     """
+    # 1. Security Check: Validate secret token
+    if secret != settings.MP_WEBHOOK_SECRET:
+        logger.warning(f"Unauthorized webhook attempt with secret: {secret}")
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
     try:
         data = await request.json()
         logger.info(f"Mercado Pago Webhook received: {data}")
