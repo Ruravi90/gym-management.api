@@ -24,6 +24,14 @@ class Settings(BaseSettings):
     # Allow CORS origin (for Railway deployment)
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "*")
 
+    # Mercado Pago configuration
+    MP_ACCESS_TOKEN: str = os.getenv("MP_ACCESS_TOKEN", "TEST-1385641134871042-022619-4a77101c4d8f488c49f060464ed619dc-232825803")
+    MP_PUBLIC_KEY: str = os.getenv("MP_PUBLIC_KEY", "TEST-be3a1a52-fc4e-4bf8-b5a5-4b69f83810b0")
+    MP_WEBHOOK_URL: str = os.getenv("MP_WEBHOOK_URL", "https://gym-managementapi-production.up.railway.app/payments/webhook")
+    MP_SUCCESS_URL: str = os.getenv("MP_SUCCESS_URL", "https://guerreros-panther.vercel.app/payment/success")
+    MP_FAILURE_URL: str = os.getenv("MP_FAILURE_URL", "https://guerreros-panther.vercel.app/payment/failure")
+    MP_PENDING_URL: str = os.getenv("MP_PENDING_URL", "https://guerreros-panther.vercel.app/payment/pending")
+
 settings = Settings()
 
 # Warn if using default secret key

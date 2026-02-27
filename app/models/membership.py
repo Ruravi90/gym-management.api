@@ -41,6 +41,12 @@ class Membership(Model):
     payment_method = fields.CharField(max_length=50, null=True)  # cash, card, bank_transfer, online
     accesses_used = fields.IntField(default=0)  # For punch-based memberships
     notes = fields.CharField(max_length=255, null=True)
+    
+    # Mercado Pago tracking
+    mp_preference_id = fields.CharField(max_length=100, null=True)
+    mp_payment_id = fields.CharField(max_length=100, null=True)
+    mp_payment_status = fields.CharField(max_length=50, null=True)
+    
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
     

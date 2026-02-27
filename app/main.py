@@ -16,6 +16,7 @@ from app.api.facial_recognition import router as facial_recognition_router
 from app.api.auth import router as auth_router
 from app.api.audit_logs import router as audit_logs_router
 from app.api.analytics import router as analytics_router
+from app.api.payments import router as payments_router
 from app.middleware.security import add_security_middleware, limiter, common_limits, auth_limits, file_upload_limits
 
 # Configure FastAPI app with metadata
@@ -66,6 +67,7 @@ logger.info("Including facial-recognition router...")
 app.include_router(facial_recognition_router, prefix="/facial-recognition", tags=["facial-recognition"])
 logger.info("Including audit-logs router...")
 app.include_router(audit_logs_router, prefix="/audit-logs", tags=["audit-logs"])
+app.include_router(payments_router, prefix="/payments", tags=["payments"])
 from app.api.member import router as member_router
 app.include_router(member_router, prefix="/member", tags=["member"])
 logger.info("All routers included successfully")

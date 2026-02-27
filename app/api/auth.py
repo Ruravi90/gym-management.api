@@ -68,9 +68,19 @@ async def register(request: Request, user_data: schemas.UserRegister):
 
     user = await crud.user.create_user(user_data=user_dict)
     
-    # Automatically link existing client profile if found
+    # Automatically link existing client profile if found or create a new one
     client = await crud.client.get_client_by_email(email=user_data.email)
-    if client and client.user_id is None:
-        await crud.client.update_client(client_id=client.id, client_update={"user_id": user.id})
+    if client:
+        if client.user_id is None:
+            await crud.client.update_client(client_id=client.id, client_update={"user_id": user.id})
+    else:
+        # Create a new client profile for the user
+        await crud.client.create_client(client_data={
+            "name": user_data.name,
+            "email": user_data.email,
+            "phone": user_data.phone,
+            "user_id": user.id,
+            "status": True
+        })
         
     return user
