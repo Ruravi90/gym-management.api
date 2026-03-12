@@ -13,9 +13,15 @@ face_service = FacialRecognitionService()
 
 @router.post("/", response_model=schemas.Client)
 async def create_client(client: schemas.ClientCreate, current_user: UserModel = Depends(get_current_user)):
-    db_client = await crud.client.get_client_by_email(email=client.email)
-    if db_client:
-        raise HTTPException(status_code=400, detail="Email already registered")
+    if client.email:
+        db_client = await crud.client.get_client_by_email(email=client.email)
+        if db_client:
+            raise HTTPException(status_code=400, detail="Email already registered")
+
+    if client.phone:
+        db_client = await crud.client.get_client_by_phone(phone=client.phone)
+        if db_client:
+            raise HTTPException(status_code=400, detail="Phone already registered")
     return await crud.client.create_client(
         client_data=client.dict(),
         user_id=current_user.id,

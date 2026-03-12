@@ -10,7 +10,7 @@ class ClientBase(BaseModel):
     membership_type: Optional[str] = None  # basic, premium, vip
     status: bool = True
 
-    @field_validator('email', mode='before')
+    @field_validator('email', 'phone', mode='before')
     @classmethod
     def empty_string_to_none(cls, v):
         if v == "":

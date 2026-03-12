@@ -21,6 +21,14 @@ async def get_client_by_email(email: str) -> Optional[Client]:
         return None
 
 
+async def get_client_by_phone(phone: str) -> Optional[Client]:
+    """Get a client by phone"""
+    try:
+        return await Client.get(phone=phone)
+    except DoesNotExist:
+        return None
+
+
 async def get_clients(skip: int = 0, limit: int = 100) -> List[Client]:
     """Get all clients with pagination"""
     return await Client.all().offset(skip).limit(limit)
