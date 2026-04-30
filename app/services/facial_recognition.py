@@ -1,7 +1,5 @@
 import cv2
 import mediapipe as mp
-from mediapipe.python.solutions import face_mesh as mp_face_mesh
-from mediapipe.python.solutions import face_detection as mp_face_detection
 import numpy as np
 from typing import Optional, List, Tuple
 import os
@@ -12,7 +10,7 @@ from app.utils.logging import logger
 class FacialRecognitionService:
     def __init__(self):
         # Stage 2: Face Mesh Engine (468 landmarks)
-        self.mp_face_mesh = mp_face_mesh
+        self.mp_face_mesh = mp.solutions.face_mesh
         self.face_mesh = self.mp_face_mesh.FaceMesh(
             static_image_mode=True,
             max_num_faces=1,
@@ -21,7 +19,7 @@ class FacialRecognitionService:
         )
         
         # Stage 1: Face Detection Pre-filter (Strict Liveness/Object check)
-        self.mp_face_detection = mp_face_detection
+        self.mp_face_detection = mp.solutions.face_detection
         self.face_detection = self.mp_face_detection.FaceDetection(
             model_selection=1, # Long-range model for kiosk distance
             min_detection_confidence=0.85 # High confidence required to avoid hands/spoofs
