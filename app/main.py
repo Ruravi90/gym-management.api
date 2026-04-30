@@ -105,6 +105,13 @@ async def startup_event():
     try:
         command = Command(tortoise_config=TORTOISE_CONFIG, app="models")
         await command.init()
+        # Fix migrations format before upgrading
+        try:
+            await command.fix_migrations()
+            logger.info("🛠️  Migration format fixed (if needed)")
+        except Exception as fix_e:
+            logger.warning(f"⚠️  Could not fix migrations format: {str(fix_e)}")
+            
         await command.upgrade(run_in_transaction=True)
         logger.info("✅ Migrations applied successfully")
     except Exception as e:
