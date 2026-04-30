@@ -10,7 +10,13 @@ from app.models.user import User as UserModel
 
 router = APIRouter()
 
-face_service = FacialRecognitionService()
+_face_service = None
+
+def get_face_service() -> FacialRecognitionService:
+    global _face_service
+    if _face_service is None:
+        _face_service = FacialRecognitionService()
+    return _face_service
 
 @router.post("/", response_model=schemas.Attendance)
 async def create_attendance(attendance: schemas.AttendanceCreate, current_user: UserModel = Depends(get_current_user)):
@@ -33,7 +39,7 @@ async def read_attendances(client_id: int):
 @limiter.limit("60 per minute")  # Higher limit for check-in since it's used frequently
 async def check_in(request: Request, file: UploadFile = File(...)):
     content = await file.read()
-    client_id = await face_service.identify_client(content)
+    client_id = await get_face_service().identify_client(content)
 
     if not client_id:
         raise HTTPException(status_code=400, detail="Face not recognized")
