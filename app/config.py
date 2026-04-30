@@ -18,19 +18,19 @@ class Settings(BaseSettings):
     PORT: int = int(os.getenv("PORT", "8000"))
 
     # Environment (development, staging, production)
-    ENVIRONMENT: str = os.getenv("ENVIRONMENT")
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "production")
 
     # Allow CORS origin (for Railway deployment)
-    FRONTEND_URL: str = os.getenv("FRONTEND_URL")
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "*")
 
     # Mercado Pago configuration
-    MP_ACCESS_TOKEN: str = os.getenv("MP_ACCESS_TOKEN")
-    MP_PUBLIC_KEY: str = os.getenv("MP_PUBLIC_KEY")
-    MP_WEBHOOK_URL: str = os.getenv("MP_WEBHOOK_URL")
-    MP_SUCCESS_URL: str = os.getenv("MP_SUCCESS_URL")
-    MP_FAILURE_URL: str = os.getenv("MP_FAILURE_URL")
-    MP_PENDING_URL: str = os.getenv("MP_PENDING_URL")
-    MP_WEBHOOK_SECRET: str = os.getenv("MP_WEBHOOK_SECRET")
+    MP_ACCESS_TOKEN: str = os.getenv("MP_ACCESS_TOKEN", "")
+    MP_PUBLIC_KEY: str = os.getenv("MP_PUBLIC_KEY", "")
+    MP_WEBHOOK_URL: str = os.getenv("MP_WEBHOOK_URL", "")
+    MP_SUCCESS_URL: str = os.getenv("MP_SUCCESS_URL", "")
+    MP_FAILURE_URL: str = os.getenv("MP_FAILURE_URL", "")
+    MP_PENDING_URL: str = os.getenv("MP_PENDING_URL", "")
+    MP_WEBHOOK_SECRET: str = os.getenv("MP_WEBHOOK_SECRET", "")
 
 settings = Settings()
 
