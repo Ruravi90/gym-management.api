@@ -103,14 +103,30 @@ async def startup_event():
 
     # Run migrations using Aerich
     try:
+        from tortoise import Tortoise
+        conn = Tortoise.get_connection("default")
+        
+        # Manual emergency fix for missing columns
+        logger.info("🛠️  Checking/Applying manual column fixes...")
+        try:
+            await conn.execute_query("ALTER TABLE `kaizen_habits` ADD COLUMN `reflection` LONGTEXT")
+            logger.info("✅ Added reflection to kaizen_habits")
+        except: pass
+        try:
+            await conn.execute_query("ALTER TABLE `kaizen_habits` ADD COLUMN `goal` LONGTEXT")
+            logger.info("✅ Added goal to kaizen_habits")
+        except: pass
+        try:
+            await conn.execute_query("ALTER TABLE `kaizen_logs` ADD COLUMN `reflection` LONGTEXT")
+            logger.info("✅ Added reflection to kaizen_logs")
+        except: pass
+
         command = Command(tortoise_config=TORTOISE_CONFIG, app="models")
         await command.init()
         # Fix migrations format before upgrading
         try:
             await command.fix_migrations()
-            logger.info("🛠️  Migration format fixed (if needed)")
-        except Exception as fix_e:
-            logger.warning(f"⚠️  Could not fix migrations format: {str(fix_e)}")
+        except: pass
             
         await command.upgrade(run_in_transaction=True)
         logger.info("✅ Migrations applied successfully")
