@@ -5,7 +5,13 @@ from app.services.facial_recognition import FacialRecognitionService
 from app.middleware.security import limiter, file_upload_limits
 
 router = APIRouter()
-face_service = FacialRecognitionService()
+_face_service = None
+
+def get_face_service() -> FacialRecognitionService:
+    global _face_service
+    if _face_service is None:
+        _face_service = FacialRecognitionService()
+    return _face_service
 
 @router.post("/verify")
 @limiter.limit(file_upload_limits)
@@ -17,7 +23,7 @@ async def verify_identity(request: Request, file: UploadFile = File(...)):
     content = await file.read()
 
     try:
-        client_id = await face_service.identify_client(content)
+        client_id = await get_face_service().identify_client(content)
         if client_id is None:
             raise HTTPException(status_code=404, detail="Client not recognized")
 
@@ -47,7 +53,7 @@ async def register_client_face(request: Request, client_id: int, file: UploadFil
 
     content = await file.read()
     try:
-        success = await face_service.register_face(client_id, content)
+        success = await get_face_service().register_face(client_id, content)
         if success:
             return {"status": "success", "message": "Face registered successfully", "client_id": client_id}
         else:

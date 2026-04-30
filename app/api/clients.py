@@ -9,7 +9,14 @@ from app.models.user import User as UserModel
 from app.utils.logging import logger
 
 router = APIRouter()
-face_service = FacialRecognitionService()
+
+_face_service = None
+
+def get_face_service() -> FacialRecognitionService:
+    global _face_service
+    if _face_service is None:
+        _face_service = FacialRecognitionService()
+    return _face_service
 
 @router.post("/", response_model=schemas.Client)
 async def create_client(client: schemas.ClientCreate, current_user: UserModel = Depends(get_current_user)):
@@ -88,7 +95,7 @@ async def register_face(client_id: int, file: UploadFile = File(...), current_us
 
     content = await file.read()
     try:
-        success = await face_service.register_face(client_id, content)
+        success = await get_face_service().register_face(client_id, content)
         return {"status": "success", "message": "Face registered successfully"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
