@@ -70,6 +70,8 @@ app.include_router(audit_logs_router, prefix="/audit-logs", tags=["audit-logs"])
 app.include_router(payments_router, prefix="/payments", tags=["payments"])
 from app.api.member import router as member_router
 app.include_router(member_router, prefix="/member", tags=["member"])
+from app.api.kaizen import router as kaizen_router
+app.include_router(kaizen_router, prefix="/kaizen", tags=["kaizen"])
 logger.info("All routers included successfully")
 
 from tortoise.contrib.fastapi import register_tortoise

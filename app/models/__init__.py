@@ -6,6 +6,7 @@ from .attendance import Attendance
 from .facial_encoding import FacialEncoding
 from .gym_class import GymClass
 from .audit_log import AuditLog, ActionTypeEnum
+from .kaizen import KaizenHabit, KaizenLog, KaizenMedal, KaizenLogStatus, MedalType
 
 __all__ = [
     "User",
@@ -18,4 +19,9 @@ __all__ = [
     "GymClass",
     "AuditLog",
     "ActionTypeEnum",
+    "KaizenHabit",
+    "KaizenLog",
+    "KaizenMedal",
+    "KaizenLogStatus",
+    "MedalType",
 ]

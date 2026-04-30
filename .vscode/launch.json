@@ -5,14 +5,18 @@
     "version": "0.2.0",
     "configurations": [
         {
-           "name": "server",
+            "name": "server",
             "type": "debugpy",
             "request": "launch",
             "module": "uvicorn",
-            "args": ["main:app", "--reload"],
+            "args": [
+                "app.main:app",
+                "--reload"
+            ],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
-            "justMyCode": true
+            "justMyCode": true,
+            "envFile": "${workspaceFolder}/.env"
         }
     ]
 }

@@ -4,10 +4,9 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     # Database configuration for Tortoise ORM
-    #DATABASE_URL: str = os.getenv("DATABASE_URL", "mysql://root:fknwSVioguFJzVGwyMJzkKDBZApslDlt@turntable.proxy.rlwy.net:49303/railway")
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "mysql://app:Ruravi90@localhost:3306/GymControl")
+    DATABASE_URL: str = os.getenv("DATABASE_URL")
     # Secret key for JWT tokens - should be set in Railway environment
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-123-change-in-production")
+    SECRET_KEY: str = os.getenv("SECRET_KEY")
 
     # Algorithm for JWT
     ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
@@ -19,19 +18,19 @@ class Settings(BaseSettings):
     PORT: int = int(os.getenv("PORT", "8000"))
 
     # Environment (development, staging, production)
-    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT")
 
     # Allow CORS origin (for Railway deployment)
-    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "*")
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL")
 
     # Mercado Pago configuration
-    MP_ACCESS_TOKEN: str = os.getenv("MP_ACCESS_TOKEN", "TEST-1385641134871042-022619-4a77101c4d8f488c49f060464ed619dc-232825803")
-    MP_PUBLIC_KEY: str = os.getenv("MP_PUBLIC_KEY", "TEST-be3a1a52-fc4e-4bf8-b5a5-4b69f83810b0")
-    MP_WEBHOOK_URL: str = os.getenv("MP_WEBHOOK_URL", "https://gym-managementapi-production.up.railway.app/payments/webhook")
-    MP_SUCCESS_URL: str = os.getenv("MP_SUCCESS_URL", "https://guerreros-panther.vercel.app/payment/success")
-    MP_FAILURE_URL: str = os.getenv("MP_FAILURE_URL", "https://guerreros-panther.vercel.app/payment/failure")
-    MP_PENDING_URL: str = os.getenv("MP_PENDING_URL", "https://guerreros-panther.vercel.app/payment/pending")
-    MP_WEBHOOK_SECRET: str = os.getenv("MP_WEBHOOK_SECRET", "super-secret-token-123")
+    MP_ACCESS_TOKEN: str = os.getenv("MP_ACCESS_TOKEN")
+    MP_PUBLIC_KEY: str = os.getenv("MP_PUBLIC_KEY")
+    MP_WEBHOOK_URL: str = os.getenv("MP_WEBHOOK_URL")
+    MP_SUCCESS_URL: str = os.getenv("MP_SUCCESS_URL")
+    MP_FAILURE_URL: str = os.getenv("MP_FAILURE_URL")
+    MP_PENDING_URL: str = os.getenv("MP_PENDING_URL")
+    MP_WEBHOOK_SECRET: str = os.getenv("MP_WEBHOOK_SECRET")
 
 settings = Settings()
 

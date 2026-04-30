@@ -22,6 +22,7 @@ async def create_client(client: schemas.ClientCreate, current_user: UserModel = 
         db_client = await crud.client.get_client_by_phone(phone=client.phone)
         if db_client:
             raise HTTPException(status_code=400, detail="Phone already registered")
+            
     return await crud.client.create_client(
         client_data=client.dict(),
         user_id=current_user.id,

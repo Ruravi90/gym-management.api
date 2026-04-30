@@ -22,7 +22,7 @@ Potente API REST para la gestión de gimnasios, desarrollada con **FastAPI** y *
 
 ### Pre-requisitos
 
-- Python 3.12+
+- Python 3.11 (Recomendado) o 3.12
 - MySQL Server
 
 ### Configuración
