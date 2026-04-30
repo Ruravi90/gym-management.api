@@ -41,7 +41,7 @@ async def record_log(habit_id: int, log_data: KaizenLogCreate) -> KaizenLog:
     # Use update_or_create to handle both inserting a new log or updating an existing one for the same date
     log, created = await KaizenLog.update_or_create(
         habit_id=habit_id, date=log_data.date,
-        defaults={"status": log_data.status}
+        defaults={"status": log_data.status, "reflection": log_data.reflection}
     )
     return log
 

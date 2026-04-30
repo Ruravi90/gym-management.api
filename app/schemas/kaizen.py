@@ -23,6 +23,7 @@ class HabitUpdate(BaseModel):
 class KaizenLogBase(BaseModel):
     date: date
     status: KaizenLogStatus
+    reflection: Optional[str] = None
 
 class KaizenLogCreate(KaizenLogBase):
     pass

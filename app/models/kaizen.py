@@ -40,6 +40,7 @@ class KaizenLog(Model):
     habit = fields.ForeignKeyField("models.KaizenHabit", related_name="logs", on_delete=fields.CASCADE)
     date = fields.DateField()
     status = fields.CharEnumField(KaizenLogStatus, default=KaizenLogStatus.PENDING)
+    reflection = fields.TextField(null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
 
     class Meta:
