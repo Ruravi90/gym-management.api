@@ -7,6 +7,8 @@ from .gym_class import GymClass, GymClassCreate, GymClassUpdate
 from .auth import UserLogin, Token, TokenData, UserRegister
 from .audit_log import AuditLog, AuditLogCreate, AuditLogUpdate, ActionTypeEnum
 from . import kaizen as kaizen
+from . import routine as routine
+from . import measurement as measurement
 
 __all__ = [
     "User",

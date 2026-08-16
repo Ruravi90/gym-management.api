@@ -17,6 +17,10 @@ from app.api.auth import router as auth_router
 from app.api.audit_logs import router as audit_logs_router
 from app.api.analytics import router as analytics_router
 from app.api.payments import router as payments_router
+from app.api.exercises import router as exercises_router
+from app.api.routines import router as routines_router
+from app.api.mentor import router as mentor_router
+from app.api.measurements import router as measurements_router
 from app.middleware.security import add_security_middleware, limiter, common_limits, auth_limits, file_upload_limits
 
 # Configure FastAPI app with metadata
@@ -72,6 +76,14 @@ from app.api.member import router as member_router
 app.include_router(member_router, prefix="/member", tags=["member"])
 from app.api.kaizen import router as kaizen_router
 app.include_router(kaizen_router, prefix="/kaizen", tags=["kaizen"])
+logger.info("Including exercises router...")
+app.include_router(exercises_router, prefix="/exercises", tags=["exercises"])
+logger.info("Including routines router...")
+app.include_router(routines_router, prefix="/routines", tags=["routines"])
+logger.info("Including mentor router...")
+app.include_router(mentor_router, prefix="/mentor", tags=["mentor"])
+logger.info("Including measurements router...")
+app.include_router(measurements_router, prefix="/measurements", tags=["measurements"])
 logger.info("All routers included successfully")
 
 from tortoise.contrib.fastapi import register_tortoise
@@ -141,6 +153,13 @@ async def startup_event():
         # Run individual seeders
         await seed_super_admin()
         await seed_membership_types()
+
+        # Seed exercise catalog (routines feature)
+        try:
+            from app.seeders.seed_exercises import seed_exercises
+            await seed_exercises()
+        except Exception as e:
+            logger.warning(f"⚠️  Warning: Could not seed exercises: {str(e)}")
 
         logger.info("✅ Database seeding completed at startup!")
     except Exception as e:

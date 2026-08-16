@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     MP_PENDING_URL: str = os.getenv("MP_PENDING_URL", "")
     MP_WEBHOOK_SECRET: str = os.getenv("MP_WEBHOOK_SECRET", "")
 
+    # Mentor IA (API compatible con OpenAI: OpenAI, Groq, OpenRouter, Ollama...)
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+
 settings = Settings()
 
 # Warn if using default secret key

@@ -1,5 +1,4 @@
 import cv2
-import mediapipe as mp
 import numpy as np
 from typing import Optional, List, Tuple
 import os
@@ -7,8 +6,24 @@ import os
 from app.models.facial_encoding import FacialEncoding
 from app.utils.logging import logger
 
+try:
+    import mediapipe as mp
+    MEDIAPIPE_AVAILABLE = True
+except ImportError:
+    mp = None
+    MEDIAPIPE_AVAILABLE = False
+
 class FacialRecognitionService:
     def __init__(self):
+        # mediapipe no tiene wheels para Python 3.14: el resto de la app arranca
+        # sin esta función y solo falla si se llega a usar el reconocimiento facial.
+        if not MEDIAPIPE_AVAILABLE:
+            raise RuntimeError(
+                "El módulo de reconocimiento facial requiere 'mediapipe', que no está "
+                "instalado en este entorno (Python 3.14 no tiene wheels). "
+                "Usa Python 3.11/3.12 para esta función."
+            )
+
         # Stage 2: Face Mesh Engine (468 landmarks)
         self.mp_face_mesh = mp.solutions.face_mesh
         self.face_mesh = self.mp_face_mesh.FaceMesh(

@@ -5,18 +5,20 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "server",
+            "name": "API (FastAPI)",
             "type": "debugpy",
             "request": "launch",
             "module": "uvicorn",
+            // Sin --reload: el recargador lanza un subproceso que rompe el debugger.
+            // Al detener el debug se detiene el servidor; para recargar, reinicia F5.
             "args": [
-                "app.main:app",
-                "--reload"
+                "app.main:app"
             ],
             "cwd": "${workspaceFolder}",
+            "python": "${workspaceFolder}/venv/bin/python",
+            "envFile": "${workspaceFolder}/.env",
             "console": "integratedTerminal",
-            "justMyCode": true,
-            "envFile": "${workspaceFolder}/.env"
+            "justMyCode": true
         }
     ]
 }
