@@ -18,7 +18,9 @@
             "python": "${workspaceFolder}/venv/bin/python",
             "envFile": "${workspaceFolder}/.env",
             "console": "integratedTerminal",
-            "justMyCode": true
+            "justMyCode": true,
+            // Mata cualquier uvicorn huérfano en 8000/8001 antes de arrancar
+            "preLaunchTask": "kill:api"
         }
     ]
 }

@@ -1,0 +1,14 @@
+{
+  // Tarea que mata procesos huérfanos que ocupen los puertos del API
+  // (p. ej. un uvicorn de una sesión de debug anterior), evitando el
+  // error "address already in use" al dar F5.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "kill:api",
+      "type": "shell",
+      "command": "pids=$(lsof -ti:8000,8001 2>/dev/null); if [ -n \"$pids\" ]; then kill -9 $pids 2>/dev/null; fi",
+      "presentation": { "reveal": "silent", "panel": "shared" }
+    }
+  ]
+}
