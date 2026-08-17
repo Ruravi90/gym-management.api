@@ -4,6 +4,7 @@ Usa una API de chat completions compatible con OpenAI (OpenAI, Groq, OpenRouter,
 Ollama, etc.) configurable vía variables de entorno. Si no hay API key configurada,
 responde con una respuesta por reglas para que la función no rompa.
 """
+import asyncio
 import json
 import logging
 import re
@@ -104,12 +105,25 @@ async def _call_llm(system_prompt: str, context: str, user_message: str, max_tok
     }
 
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.post(url, headers=headers, json=payload)
-            resp.raise_for_status()
-            data = resp.json()
-            reply = data["choices"][0]["message"]["content"].strip()
-            return {"reply": reply, "provider": settings.OPENAI_MODEL}
+        # Retry ante rate limits (429) y request too large por TPM (413) del tier
+        # gratis de Groq/OpenRouter. Los errores 5xx y 498 (flex capacity) también
+        # son transitorios, así que se reintentan con backoff.
+        last_error: Optional[Exception] = None
+        async with httpx.AsyncClient(timeout=60) as client:
+            for attempt in range(3):
+                resp = await client.post(url, headers=headers, json=payload)
+                if resp.status_code in (429, 413, 498) or resp.status_code >= 500:
+                    last_error = httpx.HTTPStatusError(
+                        f"Transient error {resp.status_code}", request=resp.request, response=resp
+                    )
+                    if attempt < 2:
+                        await asyncio.sleep(2 * (attempt + 1))  # 2s, 4s
+                        continue
+                    raise last_error
+                resp.raise_for_status()
+                data = resp.json()
+                reply = data["choices"][0]["message"]["content"].strip()
+                return {"reply": reply, "provider": settings.OPENAI_MODEL}
     except Exception as e:  # noqa: BLE001 - respuesta amigable ante cualquier fallo
         logger.exception("LLM call failed")
         return {
