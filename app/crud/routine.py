@@ -193,6 +193,16 @@ async def get_active_session(client_id: int, routine_id: int, day_id: int) -> Op
 
 
 async def create_session(client_id: int, data: WorkoutSessionCreate) -> WorkoutSession:
+    # Evitar duplicados: si ya hay una sesión pending para ese día, reusarla
+    existing = await WorkoutSession.filter(
+        client_id=client_id,
+        routine_id=data.routine_id,
+        day_id=data.day_id,
+        status="pending",
+    ).order_by("-id").first()
+    if existing:
+        return await _load_session(existing.id)
+
     session = await WorkoutSession.create(
         client_id=client_id,
         routine_id=data.routine_id,
