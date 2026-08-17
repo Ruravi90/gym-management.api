@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from app import crud, schemas
@@ -186,6 +187,23 @@ async def generate_routine(
     pidiéndole que elija uno (ask_body_type=True).
     """
     client = await get_current_client(current_user)
+
+    # Límite: máximo 2 rutinas generadas por IA al mes
+    now = datetime.now()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    routines_this_month = await crud.routine.Routine.filter(
+        client_id=client.id,
+        created_at__gte=month_start,
+    ).count()
+    if routines_this_month >= 2:
+        return schemas.routine.RoutineGenerationResponse(
+            ok=False,
+            reply=(
+                "📋 Este mes ya generaste 2 rutinas con IA. "
+                "Un buen plan necesita al menos 4 semanas para ver resultados. "
+                "Seguí con tu rutina actual y volvé a generar una nueva el próximo mes. 💪"
+            ),
+        )
 
     body_type = request.body_type.strip().lower() if request.body_type else (current_user.body_type or "")
     if body_type and body_type not in schemas.routine.BODY_TYPES:
