@@ -72,6 +72,7 @@ app.include_router(facial_recognition_router, prefix="/facial-recognition", tags
 logger.info("Including audit-logs router...")
 app.include_router(audit_logs_router, prefix="/audit-logs", tags=["audit-logs"])
 app.include_router(payments_router, prefix="/payments", tags=["payments"])
+app.include_router(analytics_router, prefix="/analytics", tags=["analytics"])
 from app.api.member import router as member_router
 app.include_router(member_router, prefix="/member", tags=["member"])
 from app.api.kaizen import router as kaizen_router
