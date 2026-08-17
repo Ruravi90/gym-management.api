@@ -29,10 +29,15 @@ ROUTINE_GENERATION_PROMPT = (
     "- Usa SOLO ejercicios de la lista disponible (nombre EXACTO).\n"
     "- Exactamente {days_per_week} día(s), 4-6 ejercicios por día.\n"
     "- Adapta series/reps/descanso al tipo de cuerpo y objetivo.\n"
+    "- Para CADA ejercicio, incluye un campo 'notes' con:\n"
+    "  1) Una instrucción técnica clave (1 línea)\n"
+    "  2) Un tip para mejorar la ejecución\n"
+    "  3) Un error común a evitar\n"
+    "  Ejemplo: 'Baja controlado 3s. Tip: pies firmes. Error: no rebotar.'\n"
     "- Responde SOLO JSON válido:\n"
     '{"name":"Mi rutina X días","description":"breve",'
     '"days":[{"name":"Día 1 - ...","exercises":'
-    '[{"exercise":"Nombre","sets":4,"reps":"8-12","rest_seconds":90,"notes":"nota"}]}]}'
+    '[{"exercise":"Nombre","sets":4,"reps":"8-12","rest_seconds":90,"notes":"instrucción. tip. error."}]}]}'
 )
 
 

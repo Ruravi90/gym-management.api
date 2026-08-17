@@ -14,8 +14,11 @@ class Exercise(Model):
     target = fields.CharField(max_length=100, null=True)
     secondary_muscles = fields.CharField(max_length=255, null=True)
     instructions = fields.TextField(null=True)
+    tips = fields.TextField(null=True)
+    common_mistakes = fields.TextField(null=True)
+    modifications = fields.TextField(null=True)
     gif_url = fields.CharField(max_length=500, null=True)
-    gif_urls = fields.JSONField(null=True)  # Lista de URLs de GIFs para carrusel
+    gif_urls = fields.JSONField(null=True)
     image_url = fields.CharField(max_length=500, null=True)
     is_active = fields.BooleanField(default=True)
     created_at = fields.DatetimeField(auto_now_add=True)

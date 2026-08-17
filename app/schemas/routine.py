@@ -16,6 +16,9 @@ class ExerciseBase(BaseModel):
     target: Optional[str] = None
     secondary_muscles: Optional[str] = None
     instructions: Optional[str] = None
+    tips: Optional[str] = None
+    common_mistakes: Optional[str] = None
+    modifications: Optional[str] = None
     gif_url: Optional[str] = None
     gif_urls: Optional[List[str]] = None
     image_url: Optional[str] = None
@@ -35,6 +38,9 @@ class ExerciseUpdate(BaseModel):
     target: Optional[str] = None
     secondary_muscles: Optional[str] = None
     instructions: Optional[str] = None
+    tips: Optional[str] = None
+    common_mistakes: Optional[str] = None
+    modifications: Optional[str] = None
     gif_url: Optional[str] = None
     gif_urls: Optional[List[str]] = None
     image_url: Optional[str] = None
