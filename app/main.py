@@ -200,6 +200,13 @@ async def startup_event():
         except Exception as e:
             logger.warning(f"⚠️  Warning: Could not seed exercises: {str(e)}")
 
+        # Seed exercise GIFs from catalog
+        try:
+            from app.seeders.update_gifs import update_gifs
+            await update_gifs()
+        except Exception as e:
+            logger.warning(f"⚠️  Warning: Could not seed exercise GIFs: {str(e)}")
+
         logger.info("✅ Database seeding completed at startup!")
     except Exception as e:
         logger.warning(f"⚠️  Warning: Could not run seeders: {str(e)}")
