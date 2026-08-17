@@ -274,7 +274,7 @@ async def generate_routine_plan(
         f"Ejercicios (nombres EXACTOS):\n{catalog_lines}"
     )
 
-    result = await _call_llm(ROUTINE_GENERATION_PROMPT, "", user_message, max_tokens=1200)
+    result = await _call_llm(ROUTINE_GENERATION_PROMPT, "", user_message, max_tokens=8000)
     plan = _parse_json_reply(result.get("reply", ""))
     if not plan or not isinstance(plan, dict) or not plan.get("days"):
         return {

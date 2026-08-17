@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     # https://openrouter.ai/api/v1 con IDs de modelo tipo openai/gpt-4o-mini.
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "https://api.groq.com/openai/v1")
-    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "llama-3.3-70b-versatile")
+    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "groq/compound")
 
 settings = Settings()
 
