@@ -158,6 +158,49 @@ async def startup_event():
             logger.info("✅ Added injuries to users")
         except: pass
 
+        # Client report rate-limit columns
+        try:
+            await conn.execute_query("ALTER TABLE `clients` ADD COLUMN `last_weekly_checkin_at` DATETIME NULL")
+            logger.info("✅ Added last_weekly_checkin_at to clients")
+        except: pass
+        try:
+            await conn.execute_query("ALTER TABLE `clients` ADD COLUMN `last_monthly_report_at` DATETIME NULL")
+            logger.info("✅ Added last_monthly_report_at to clients")
+        except: pass
+
+        # Exercise GIF + detail columns
+        try:
+            await conn.execute_query("ALTER TABLE `exercises` ADD COLUMN `gif_urls` JSON NULL")
+            logger.info("✅ Added gif_urls to exercises")
+        except: pass
+        try:
+            await conn.execute_query("ALTER TABLE `exercises` ADD COLUMN `tips` TEXT NULL")
+            logger.info("✅ Added tips to exercises")
+        except: pass
+        try:
+            await conn.execute_query("ALTER TABLE `exercises` ADD COLUMN `common_mistakes` TEXT NULL")
+            logger.info("✅ Added common_mistakes to exercises")
+        except: pass
+        try:
+            await conn.execute_query("ALTER TABLE `exercises` ADD COLUMN `modifications` TEXT NULL")
+            logger.info("✅ Added modifications to exercises")
+        except: pass
+
+        # Mentor messages history table
+        try:
+            await conn.execute_query(
+                "CREATE TABLE IF NOT EXISTS `mentor_messages` ("
+                "`id` INT AUTO_INCREMENT PRIMARY KEY,"
+                "`client_id` INT NOT NULL,"
+                "`role` VARCHAR(20) NOT NULL,"
+                "`content` TEXT NOT NULL,"
+                "`message_type` VARCHAR(30) NOT NULL,"
+                "`created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                ")"
+            )
+            logger.info("✅ Created mentor_messages table")
+        except: pass
+
         command = Command(tortoise_config=TORTOISE_CONFIG, app="models")
 
         # 1) Fix old-format migrations FIRST (aerich 0.9.2 requires MODELS_STATE
