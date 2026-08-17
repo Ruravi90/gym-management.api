@@ -9,6 +9,7 @@ from .audit_log import AuditLog, ActionTypeEnum
 from .kaizen import KaizenHabit, KaizenLog, KaizenMedal, KaizenLogStatus, MedalType
 from .routine import Exercise, Routine, RoutineDay, RoutineExercise, WorkoutSession, SetLog
 from .measurement import BodyMeasurement
+from .mentor_message import MentorMessage
 
 __all__ = [
     "User",
@@ -33,4 +34,5 @@ __all__ = [
     "WorkoutSession",
     "SetLog",
     "BodyMeasurement",
+    "MentorMessage",
 ]

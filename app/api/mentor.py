@@ -71,6 +71,16 @@ async def _profile_response(client: Client, current_user: User):
     )
 
 
+@router.get("/messages", response_model=list[schemas.routine.MentorMessageResponse])
+async def get_messages(
+    current_user: User = Depends(get_current_user),
+):
+    """Devuelve el historial de mensajes del mentor para el cliente."""
+    client = await get_current_client(current_user)
+    messages = await crud.mentor.get_client_messages(client_id=client.id, limit=50)
+    return messages
+
+
 @router.post("/weekly-checkin", response_model=schemas.routine.MentorResponse)
 async def weekly_checkin(
     current_user: User = Depends(get_current_user),
@@ -101,13 +111,14 @@ async def weekly_checkin(
         client.last_weekly_checkin_at = now
         await client.save(update_fields=["last_weekly_checkin_at"])
 
+        # Guardar mensaje en historial
+        await crud.mentor.create_message(client.id, "mentor", result["reply"], "checkin")
+
         return schemas.routine.MentorResponse(**result)
     except Exception as e:
         logger.exception("Error in /mentor/weekly-checkin")
-        return schemas.routine.MentorResponse(
-            reply="No pude generar tu reporte semanal en este momento. Inténtalo de nuevo en unos segundos. 💪",
-            provider=None,
-        )
+        reply = "No pude generar tu reporte semanal en este momento. Inténtalo de nuevo en unos segundos. 💪"
+        return schemas.routine.MentorResponse(reply=reply, provider=None)
 
 
 @router.get("/body-type", response_model=schemas.routine.BodyTypeResponse)
@@ -292,14 +303,19 @@ async def generate_routine(
     )
 
     total_exercises = sum(len(d.exercises) for d in routine.days)
+    reply = (
+        f"🎉 ¡Listo! Creé tu rutina **\"{routine.name}\"** con {len(routine.days)} día(s) "
+        f"y {total_exercises} ejercicios, adaptada a tu tipo de cuerpo ({body_type}) "
+        f"y tu objetivo ({request.goal}). Ya puedes abrirla y empezar a entrenar con "
+        f"los GIFs de cada ejercicio. ¡A darle! 💪🔥"
+    )
+
+    # Guardar mensaje en historial
+    await crud.mentor.create_message(client.id, "mentor", reply, "routine")
+
     return schemas.routine.RoutineGenerationResponse(
         ok=True,
-        reply=(
-            f"🎉 ¡Listo! Creé tu rutina **\"{routine.name}\"** con {len(routine.days)} día(s) "
-            f"y {total_exercises} ejercicios, adaptada a tu tipo de cuerpo ({body_type}) "
-            f"y tu objetivo ({request.goal}). Ya puedes abrirla y empezar a entrenar con "
-            f"los GIFs de cada ejercicio. ¡A darle! 💪🔥"
-        ),
+        reply=reply,
         provider=result.get("provider"),
         routine_id=routine.id,
         routine_name=routine.name,

@@ -193,6 +193,17 @@ class MentorResponse(BaseModel):
     provider: Optional[str] = None
 
 
+class MentorMessageResponse(BaseModel):
+    id: int
+    role: str
+    content: str
+    message_type: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 BODY_TYPES = {"ectomorph", "mesomorph", "endomorph"}
 
 
