@@ -245,6 +245,9 @@ async def generate_routine_plan(
 
     Recibe TODO el intake del instructor (perfil físico + preferencias) para
     que la rutina se adapte a los objetivos y limitaciones del cliente.
+
+    Si el LLM falla o devuelve un JSON inválido (p. ej. por rate limits del tier
+    gratis), genera una rutina base por reglas para no bloquear la función.
     """
     if not settings.OPENAI_API_KEY:
         return {
@@ -291,13 +294,10 @@ async def generate_routine_plan(
     result = await _call_llm(ROUTINE_GENERATION_PROMPT, "", user_message, max_tokens=8000)
     plan = _parse_json_reply(result.get("reply", ""))
     if not plan or not isinstance(plan, dict) or not plan.get("days"):
-        return {
-            "ok": False,
-            "reply": (
-                "🤔 No pude estructurar tu rutina esta vez. Inténtalo de nuevo en unos "
-                "segundos o reformula tu objetivo."
-            ),
-        }
+        return _fallback_routine_plan(
+            body_type, goal, days_per_week, equipment, experience,
+            duration_minutes, catalog,
+        )
 
     # Normalizar el plan: números y campos por defecto
     days = []
@@ -328,14 +328,119 @@ async def generate_routine_plan(
             )
 
     if not days:
-        return {
-            "ok": False,
-            "reply": "😅 No encontré ejercicios de mi catálogo en la propuesta. Inténtalo de nuevo.",
-        }
+        return _fallback_routine_plan(
+            body_type, goal, days_per_week, equipment, experience,
+            duration_minutes, catalog,
+        )
 
     plan["name"] = plan.get("name") or f"Mi rutina de {days_per_week} días"
     plan["days"] = days
     return {"ok": True, "plan": plan, "provider": result.get("provider")}
+
+
+# =====================================================================
+# Rutina base por reglas (fallback sin IA)
+# =====================================================================
+_PUSH_GROUPS = {"chest", "deltoids", "shoulders", "triceps"}
+_PULL_GROUPS = {"biceps", "traps", "trapezius", "forearms"}
+_LEGS_GROUPS = {"quadriceps", "hamstrings", "glutes", "calves"}
+_CORE_GROUPS = {"core", "obliques", "hip flexors"}
+
+
+def _goal_is_muscle(goal: Optional[str]) -> bool:
+    g = _norm(goal)
+    return g in ("muscle", "muscle gain", "musclegains", "volumen", "hipertrofia", "fuerza", "fuerza maxima", "tonificar", "strength", "hypertrophy")
+
+
+def _day_template(day_name: str, group_set: set, catalog: List, n: int = 5, seed: int = 0) -> dict:
+    pool = [ex for ex in catalog if (ex.muscle_group or "").lower() in group_set]
+    if not pool:
+        pool = list(catalog)
+    picked, idx = [], seed
+    while len(picked) < n and pool:
+        ex = pool[idx % len(pool)]
+        if ex not in picked:
+            picked.append(ex)
+        idx += 1
+    exercises = [
+        {
+            "exercise_id": ex.id,
+            "sets": 3,
+            "reps": "10",
+            "rest_seconds": 60,
+            "notes": None,
+            "order": i,
+        }
+        for i, ex in enumerate(picked)
+    ]
+    return {"name": day_name, "day_of_week": None, "order": 0, "exercises": exercises}
+
+
+def _fallback_routine_plan(
+    body_type: str,
+    goal: str,
+    days_per_week: int,
+    equipment: Optional[str],
+    experience: Optional[str],
+    duration_minutes: Optional[int],
+    catalog: List,
+) -> dict:
+    """Genera una rutina válida por plantillas de grupos musculares.
+
+    Se usa cuando el LLM falla por rate limits. No es tan personalizada como la
+    IA, pero devuelve una rutina funcional con ejercicios reales del catálogo.
+    """
+    days = max(1, min(int(days_per_week or 3), 7))
+    full_body = _PUSH_GROUPS | _PULL_GROUPS | _LEGS_GROUPS | _CORE_GROUPS
+    if not _goal_is_muscle(goal):
+        templates = [("Cuerpo completo", full_body)] * days
+    elif days <= 2:
+        templates = [("Cuerpo completo", full_body)] * days
+    elif days == 3:
+        templates = [
+            ("Empuje (pecho, hombros, tríceps)", _PUSH_GROUPS),
+            ("Tirón (espalda, bíceps, antebrazos)", _PULL_GROUPS),
+            ("Piernas y core", _LEGS_GROUPS | _CORE_GROUPS),
+        ]
+    elif days == 4:
+        templates = [
+            ("Empuje (pecho, hombros, tríceps)", _PUSH_GROUPS),
+            ("Tirón (espalda, bíceps, antebrazos)", _PULL_GROUPS),
+            ("Piernas", _LEGS_GROUPS),
+            ("Torso superior y core", _PUSH_GROUPS | _PULL_GROUPS | _CORE_GROUPS),
+        ]
+    elif days == 5:
+        templates = [
+            ("Empuje (pecho, hombros, tríceps)", _PUSH_GROUPS),
+            ("Tirón (espalda, bíceps, antebrazos)", _PULL_GROUPS),
+            ("Piernas", _LEGS_GROUPS),
+            ("Torso superior y core", _PUSH_GROUPS | _PULL_GROUPS | _CORE_GROUPS),
+            ("Piernas y core", _LEGS_GROUPS | _CORE_GROUPS),
+        ]
+    else:
+        templates = [
+            ("Empuje (pecho, hombros, tríceps)", _PUSH_GROUPS),
+            ("Tirón (espalda, bíceps, antebrazos)", _PULL_GROUPS),
+            ("Piernas y core", _LEGS_GROUPS | _CORE_GROUPS),
+            ("Torso superior y core", _PUSH_GROUPS | _PULL_GROUPS | _CORE_GROUPS),
+            ("Empuje y core", _PUSH_GROUPS | _CORE_GROUPS),
+            ("Tirón y core", _PULL_GROUPS | _CORE_GROUPS),
+        ]
+
+    plan_days = []
+    for i, (name, group_set) in enumerate(templates):
+        tmpl = _day_template(name, group_set, catalog, seed=i * 2)
+        tmpl["order"] = i
+        plan_days.append(tmpl)
+
+    return {
+        "ok": True,
+        "plan": {
+            "name": f"Mi rutina de {days} días",
+            "days": plan_days,
+        },
+        "provider": "plantilla-base",
+    }
 
 
 def build_client_context(
