@@ -121,6 +121,91 @@ async def weekly_checkin(
         return schemas.routine.MentorResponse(reply=reply, provider=None)
 
 
+@router.post("/monthly-report", response_model=schemas.routine.MentorResponse)
+async def monthly_report(
+    current_user: User = Depends(get_current_user),
+):
+    """Genera el reporte mensual: tendencia completa de 4 semanas + recomendación de rutina."""
+    try:
+        client = await get_current_client(current_user)
+
+        # Rate limit: 1 reporte mensual por mes
+        now = datetime.now()
+        if client.last_monthly_report_at:
+            days_since = (now - client.last_monthly_report_at).days
+            if days_since < 28:
+                days_left = 28 - days_since
+                return schemas.routine.MentorResponse(
+                    reply=(
+                        f"📊 Ya generaste tu reporte mensual. "
+                        f"Volvé a generarlo en {days_left} día(s). "
+                        f"Un reporte mensual por mes es suficiente para analizar tu progreso. 💪"
+                    ),
+                    provider=None,
+                )
+
+        # Contexto ampliado: 4 semanas de medidas
+        measurements = await crud.measurement.list_measurements(client_id=client.id, limit=8)
+        routines = await crud.routine.get_client_routines(client_id=client.id, active_only=False)
+        recent_sessions = await crud.routine.get_client_sessions(client_id=client.id, limit=30)
+
+        # Construir contexto más detallado para el mensual
+        lines = []
+        if current_user.body_type:
+            info = mentor_service.BODY_TYPE_INFO.get(current_user.body_type, "")
+            lines.append(f"Cuerpo: {current_user.body_type}. {info}")
+        if current_user.age:
+            lines.append(f"Edad: {current_user.age}a")
+        if current_user.height_cm and measurements:
+            last_w = next((m.weight_kg for m in measurements if m.weight_kg), None)
+            if last_w:
+                m = current_user.height_cm / 100.0
+                bmi = round(float(last_w) / (m * m), 1)
+                lines.append(f"Altura: {current_user.height_cm}cm, Peso: {last_w}kg, IMC: {mentor_service._bmi_category(bmi)}")
+
+        active = [r for r in routines if r.is_active]
+        if active:
+            for r in active[:2]:
+                days = ", ".join(d.name for d in r.days[:4]) if r.days else "sin días"
+                lines.append(f"Rutina: {r.name} ({days})")
+
+        if recent_sessions:
+            done = sum(1 for s in recent_sessions if s.status == "completed")
+            lines.append(f"Sesiones último mes: {done}/{len(recent_sessions)}")
+
+        if measurements:
+            lines.append("Medidas (últimas semanas):")
+            for m_data in measurements[:6]:
+                parts = []
+                for label, field in (
+                    ("peso", "weight_kg"),
+                    ("cintura", "waist_cm"),
+                    ("pierna", "thigh_cm"),
+                    ("brazo", "arm_relaxed_cm"),
+                ):
+                    v = getattr(m_data, field, None)
+                    if v is not None:
+                        parts.append(f"{label}:{v}")
+                if parts:
+                    lines.append(f"  {m_data.date}: {', '.join(parts)}")
+
+        context = "; ".join(lines)
+        result = await mentor_service.monthly_report(context)
+
+        # Registrar la fecha del reporte mensual
+        client.last_monthly_report_at = now
+        await client.save(update_fields=["last_monthly_report_at"])
+
+        # Guardar mensaje en historial
+        await crud.mentor.create_message(client.id, "mentor", result["reply"], "monthly_report")
+
+        return schemas.routine.MentorResponse(**result)
+    except Exception as e:
+        logger.exception("Error in /mentor/monthly-report")
+        reply = "No pude generar tu reporte mensual en este momento. Inténtalo de nuevo en unos segundos. 💪"
+        return schemas.routine.MentorResponse(reply=reply, provider=None)
+
+
 @router.get("/body-type", response_model=schemas.routine.BodyTypeResponse)
 async def get_body_type(
     current_user: User = Depends(get_current_user),

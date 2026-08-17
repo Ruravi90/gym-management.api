@@ -46,6 +46,18 @@ WEEKLY_CHECKIN_PROMPT = (
     "Máx 200 palabras, tono motivador."
 )
 
+MONTHLY_REPORT_PROMPT = (
+    "Coach de fitness. Genera REPORTE MENSUAL en español con markdown.\n"
+    "Tienes 4 semanas de datos. Analiza la tendencia completa.\n"
+    "Estructura:\n"
+    "1) 📊 **Resumen del mes**: peso, medidas y cambios acumulados.\n"
+    "2) 📈 **Tendencia**: mejoró, empeoró o se mantuvo en cada métrica.\n"
+    "3) 🏋️ **Constancia**: total de sesiones, regularidad.\n"
+    "4) 💡 **Recomendaciones**: 3-4 acciones para el próximo mes.\n"
+    "5) 🔄 **¿Cambiar rutina?**: recomendación fundamentada (continuar/cambiar/ajustar).\n"
+    "Sé específico con números. Máx 300 palabras, tono motivador."
+)
+
 
 async def _call_llm(system_prompt: str, context: str, user_message: str, max_tokens: int = 300) -> dict:
     """Llamada base a la API compatible con OpenAI. Devuelve reply + provider."""
@@ -104,11 +116,6 @@ async def _call_llm(system_prompt: str, context: str, user_message: str, max_tok
         }
 
 
-async def mentor_chat(message: str, context: str = "") -> dict:
-    """Envía el mensaje al LLM con el contexto del cliente. Devuelve la respuesta del mentor."""
-    return await _call_llm(SYSTEM_PROMPT, context, message, max_tokens=300)
-
-
 async def weekly_checkin(context: str = "") -> dict:
     """Genera el reporte semanal del cliente con medidas + rutina + sesiones."""
     return await _call_llm(
@@ -116,6 +123,16 @@ async def weekly_checkin(context: str = "") -> dict:
         context,
         "Genera mi reporte semanal de progreso.",
         max_tokens=400,
+    )
+
+
+async def monthly_report(context: str = "") -> dict:
+    """Genera el reporte mensual del cliente con tendencia completa."""
+    return await _call_llm(
+        MONTHLY_REPORT_PROMPT,
+        context,
+        "Genera mi reporte mensual de progreso.",
+        max_tokens=500,
     )
 
 

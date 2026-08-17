@@ -12,6 +12,7 @@ class Client(Model):
     status = fields.BooleanField(default=True)
     user = fields.ForeignKeyField("models.User", related_name="client_profile", null=True, on_delete=fields.SET_NULL)
     last_weekly_checkin_at = fields.DatetimeField(null=True)
+    last_monthly_report_at = fields.DatetimeField(null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
     
