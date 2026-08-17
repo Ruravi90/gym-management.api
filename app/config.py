@@ -33,11 +33,13 @@ class Settings(BaseSettings):
     MP_WEBHOOK_SECRET: str = os.getenv("MP_WEBHOOK_SECRET", "")
 
     # Mentor IA (API compatible con OpenAI: OpenAI, Groq, OpenRouter, Ollama...)
-    # Por defecto apunta a Groq (plan gratuito). Para OpenRouter usa
-    # https://openrouter.ai/api/v1 con IDs de modelo tipo openai/gpt-4o-mini.
+    # Por defecto apunta a Google Gemini (tier gratuito en AI Studio, sin tarjeta).
+    # Modelos válidos: gemini-3.5-flash, gemini-3.6-flash, gemini-2.5-flash (retirado).
+    # Para Groq usa https://api.groq.com/openai/v1 con groq/compound.
+    # Para OpenRouter usa https://openrouter.ai/api/v1 con IDs tipo openai/gpt-4o-mini.
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
-    OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "https://api.groq.com/openai/v1")
-    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "groq/compound")
+    OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
+    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gemini-3.5-flash")
 
 settings = Settings()
 

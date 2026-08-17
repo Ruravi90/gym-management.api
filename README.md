@@ -40,10 +40,11 @@ DATABASE_URL=mysql://root:root@localhost:3306/gymcontrol
 SECRET_KEY=tu_clave_secreta_aqui
 ENVIRONMENT=development
 
-# Mentor IA (opcional — API compatible con OpenAI: OpenAI, Groq, OpenRouter, Ollama...)
-OPENAI_API_KEY=tu_api_key
-OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_MODEL=gpt-4o-mini
+# Mentor IA (opcional — API compatible con OpenAI: OpenAI, Gemini, Groq, OpenRouter, Ollama...)
+# Recomendado: Google Gemini free (aistudio.google.com/apikey). gemini-2.5-flash está retirado.
+OPENAI_API_KEY=AIza...tu_key_gemini
+OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
+OPENAI_MODEL=gemini-3.5-flash
 ```
 
 > 💡 **Mentor IA (FitMentor):** si no configuras `OPENAI_API_KEY`, el endpoint `/mentor/chat` responde con un mensaje por defecto para que la app no se rompa. También puedes apuntar `OPENAI_BASE_URL` a Groq, OpenRouter o un Ollama local.
