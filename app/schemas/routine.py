@@ -17,6 +17,7 @@ class ExerciseBase(BaseModel):
     secondary_muscles: Optional[str] = None
     instructions: Optional[str] = None
     gif_url: Optional[str] = None
+    gif_urls: Optional[List[str]] = None
     image_url: Optional[str] = None
 
 
@@ -35,6 +36,7 @@ class ExerciseUpdate(BaseModel):
     secondary_muscles: Optional[str] = None
     instructions: Optional[str] = None
     gif_url: Optional[str] = None
+    gif_urls: Optional[List[str]] = None
     image_url: Optional[str] = None
     is_active: Optional[bool] = None
 

@@ -15,6 +15,7 @@ class Exercise(Model):
     secondary_muscles = fields.CharField(max_length=255, null=True)
     instructions = fields.TextField(null=True)
     gif_url = fields.CharField(max_length=500, null=True)
+    gif_urls = fields.JSONField(null=True)  # Lista de URLs de GIFs para carrusel
     image_url = fields.CharField(max_length=500, null=True)
     is_active = fields.BooleanField(default=True)
     created_at = fields.DatetimeField(auto_now_add=True)
