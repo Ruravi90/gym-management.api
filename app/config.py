@@ -40,10 +40,16 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# Warn if using default secret key
-if settings.SECRET_KEY == "your-secret-key-123-change-in-production":
+# Fail-safe: en producción la SECRET_KEY debe ser un valor real (no el placeholder ni vacía),
+# porque se usa para firmar los JWT. En desarrollo solo se advierte.
+DEFAULT_SECRET_KEY = "your-secret-key-123-change-in-production"
+if not settings.SECRET_KEY or settings.SECRET_KEY == DEFAULT_SECRET_KEY:
     if settings.ENVIRONMENT == "production":
-        raise RuntimeError("SECRET_KEY must be set in production! Set the SECRET_KEY environment variable.")
+        raise RuntimeError(
+            "SECRET_KEY must be set in production! Define la variable de entorno SECRET_KEY "
+            "con un valor aleatorio (p. ej. el resultado de: openssl rand -hex 32). "
+            "NO uses el valor de ejemplo del .env.example."
+        )
     else:
         warnings.warn("Using default SECRET_KEY. Set SECRET_KEY env var for production.", stacklevel=2)
 
