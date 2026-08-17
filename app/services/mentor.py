@@ -29,6 +29,12 @@ ROUTINE_GENERATION_PROMPT = (
     "REGLAS:\n"
     "- Usa SOLO ejercicios de la lista disponible (nombre EXACTO).\n"
     "- Exactamente {days_per_week} día(s), 4-6 ejercicios por día.\n"
+    "- Para objetivos de ganar músculo/fuerza usa una DIVISIÓN por grupos "
+    "musculares (p. ej. Empuje / Tirón / Piernas o Pecho-Tríceps, Espalda-Bíceps, "
+    "Piernas, etc.), NO cuerpo completo todos los días.\n"
+    "- CADA día debe tener un nombre ÚNICO y descriptivo del foco "
+    "(ej. 'Día 1 - Empuje (pecho, hombros, tríceps)'). NUNCA repitas el nombre "
+    "de un día en otro.\n"
     "- Adapta series/reps/descanso al tipo de cuerpo y objetivo.\n"
     "- Para CADA ejercicio, incluye un campo 'notes' con:\n"
     "  1) Una instrucción técnica clave (1 línea)\n"
@@ -37,7 +43,7 @@ ROUTINE_GENERATION_PROMPT = (
     "  Ejemplo: 'Baja controlado 3s. Tip: pies firmes. Error: no rebotar.'\n"
     "- Responde SOLO JSON válido:\n"
     '{"name":"Mi rutina X días","description":"breve",'
-    '"days":[{"name":"Día 1 - ...","exercises":'
+    '"days":[{"name":"Día 1 - Empuje","exercises":'
     '[{"exercise":"Nombre","sets":4,"reps":"8-12","rest_seconds":90,"notes":"instrucción. tip. error."}]}]}'
 )
 
@@ -330,6 +336,10 @@ async def generate_routine_plan(
             duration_minutes, catalog,
         )
 
+    # Si la IA nombró todos los días igual (p. ej. "Cuerpo completo"), renombrar
+    # según el foco muscular de cada día para que sean únicos y descriptivos.
+    _rename_duplicate_days(days, catalog)
+
     plan["name"] = plan.get("name") or f"Mi rutina de {days_per_week} días"
     plan["days"] = days
     return {"ok": True, "plan": plan, "provider": result.get("provider")}
@@ -346,10 +356,14 @@ _CORE_GROUPS = {"core", "obliques", "hip flexors"}
 
 def _goal_is_muscle(goal: Optional[str]) -> bool:
     g = _norm(goal)
-    return g in ("muscle", "muscle gain", "musclegains", "volumen", "hipertrofia", "fuerza", "fuerza maxima", "tonificar", "strength", "hypertrophy")
+    return g in (
+        "muscle", "muscle gain", "musclegain", "musclegains",
+        "volumen", "hipertrofia", "fuerza", "fuerza maxima",
+        "tonificar", "tono", "strength", "hypertrophy",
+    )
 
 
-def _day_template(day_name: str, group_set: set, catalog: List, n: int = 5, seed: int = 0) -> dict:
+def _day_template(day_name: str, group_set: set, catalog: List, n: int = 5, seed: int = 0, sets: int = 3, reps: str = "10", rest: int = 60) -> dict:
     pool = [ex for ex in catalog if (ex.muscle_group or "").lower() in group_set]
     if not pool:
         pool = list(catalog)
@@ -362,15 +376,50 @@ def _day_template(day_name: str, group_set: set, catalog: List, n: int = 5, seed
     exercises = [
         {
             "exercise_id": ex.id,
-            "sets": 3,
-            "reps": "10",
-            "rest_seconds": 60,
+            "sets": sets,
+            "reps": reps,
+            "rest_seconds": rest,
             "notes": None,
             "order": i,
         }
         for i, ex in enumerate(picked)
     ]
     return {"name": day_name, "day_of_week": None, "order": 0, "exercises": exercises}
+
+
+def _classify_day_name(muscle_groups: set, day_index: int) -> str:
+    """Nombre de día según los grupos musculares que entrena."""
+    has_push = bool(muscle_groups & _PUSH_GROUPS)
+    has_pull = bool(muscle_groups & _PULL_GROUPS)
+    has_legs = bool(muscle_groups & _LEGS_GROUPS)
+    has_core = bool(muscle_groups & _CORE_GROUPS)
+    if has_push and has_pull and has_legs:
+        base = "Cuerpo completo"
+    elif has_push and has_pull:
+        base = "Torso superior"
+    elif has_legs:
+        base = "Piernas y core" if has_core else "Piernas"
+    elif has_push:
+        base = "Empuje (pecho, hombros, tríceps)"
+    elif has_pull:
+        base = "Tirón (espalda, bíceps, antebrazos)"
+    else:
+        base = "Cuerpo completo"
+    return f"Día {day_index + 1} - {base}"
+
+
+def _rename_duplicate_days(days: List[dict], catalog: List) -> List[dict]:
+    """Renombra los días si todos comparten el mismo nombre (bug visto con la IA)."""
+    names = [d.get("name") or "" for d in days]
+    if len(set(names)) > 1:
+        return days
+    for idx, d in enumerate(days):
+        groups = set()
+        for ex in catalog:
+            if ex.muscle_group and any(e["exercise_id"] == ex.id for e in d["exercises"]):
+                groups.add(ex.muscle_group.lower())
+        d["name"] = _classify_day_name(groups, idx)
+    return days
 
 
 def _fallback_routine_plan(
@@ -389,46 +438,53 @@ def _fallback_routine_plan(
     """
     days = max(1, min(int(days_per_week or 3), 7))
     full_body = _PUSH_GROUPS | _PULL_GROUPS | _LEGS_GROUPS | _CORE_GROUPS
-    if not _goal_is_muscle(goal):
-        templates = [("Cuerpo completo", full_body)] * days
-    elif days <= 2:
+    muscle_goal = _goal_is_muscle(goal)
+    if days <= 2:
         templates = [("Cuerpo completo", full_body)] * days
     elif days == 3:
         templates = [
-            ("Empuje (pecho, hombros, tríceps)", _PUSH_GROUPS),
-            ("Tirón (espalda, bíceps, antebrazos)", _PULL_GROUPS),
-            ("Piernas y core", _LEGS_GROUPS | _CORE_GROUPS),
+            ("Día 1 - Empuje (pecho, hombros, tríceps)", _PUSH_GROUPS),
+            ("Día 2 - Tirón (espalda, bíceps, antebrazos)", _PULL_GROUPS),
+            ("Día 3 - Piernas y core", _LEGS_GROUPS | _CORE_GROUPS),
         ]
     elif days == 4:
         templates = [
-            ("Empuje (pecho, hombros, tríceps)", _PUSH_GROUPS),
-            ("Tirón (espalda, bíceps, antebrazos)", _PULL_GROUPS),
-            ("Piernas", _LEGS_GROUPS),
-            ("Torso superior y core", _PUSH_GROUPS | _PULL_GROUPS | _CORE_GROUPS),
+            ("Día 1 - Empuje (pecho, hombros, tríceps)", _PUSH_GROUPS),
+            ("Día 2 - Tirón (espalda, bíceps, antebrazos)", _PULL_GROUPS),
+            ("Día 3 - Piernas", _LEGS_GROUPS),
+            ("Día 4 - Torso superior y core", _PUSH_GROUPS | _PULL_GROUPS | _CORE_GROUPS),
         ]
     elif days == 5:
         templates = [
-            ("Empuje (pecho, hombros, tríceps)", _PUSH_GROUPS),
-            ("Tirón (espalda, bíceps, antebrazos)", _PULL_GROUPS),
-            ("Piernas", _LEGS_GROUPS),
-            ("Torso superior y core", _PUSH_GROUPS | _PULL_GROUPS | _CORE_GROUPS),
-            ("Piernas y core", _LEGS_GROUPS | _CORE_GROUPS),
+            ("Día 1 - Empuje (pecho, hombros, tríceps)", _PUSH_GROUPS),
+            ("Día 2 - Tirón (espalda, bíceps, antebrazos)", _PULL_GROUPS),
+            ("Día 3 - Piernas", _LEGS_GROUPS),
+            ("Día 4 - Torso superior y core", _PUSH_GROUPS | _PULL_GROUPS | _CORE_GROUPS),
+            ("Día 5 - Piernas y core", _LEGS_GROUPS | _CORE_GROUPS),
         ]
     else:
         templates = [
-            ("Empuje (pecho, hombros, tríceps)", _PUSH_GROUPS),
-            ("Tirón (espalda, bíceps, antebrazos)", _PULL_GROUPS),
-            ("Piernas y core", _LEGS_GROUPS | _CORE_GROUPS),
-            ("Torso superior y core", _PUSH_GROUPS | _PULL_GROUPS | _CORE_GROUPS),
-            ("Empuje y core", _PUSH_GROUPS | _CORE_GROUPS),
-            ("Tirón y core", _PULL_GROUPS | _CORE_GROUPS),
+            ("Día 1 - Empuje (pecho, hombros, tríceps)", _PUSH_GROUPS),
+            ("Día 2 - Tirón (espalda, bíceps, antebrazos)", _PULL_GROUPS),
+            ("Día 3 - Piernas y core", _LEGS_GROUPS | _CORE_GROUPS),
+            ("Día 4 - Torso superior y core", _PUSH_GROUPS | _PULL_GROUPS | _CORE_GROUPS),
+            ("Día 5 - Empuje y core", _PUSH_GROUPS | _CORE_GROUPS),
+            ("Día 6 - Tirón y core", _PULL_GROUPS | _CORE_GROUPS),
         ]
+
+    # Fat loss / resistencia: más repeticiones y descansos cortos
+    if muscle_goal:
+        sets, reps, rest = 3, "8-12", 90
+    else:
+        sets, reps, rest = 3, "12-15", 45
 
     plan_days = []
     for i, (name, group_set) in enumerate(templates):
-        tmpl = _day_template(name, group_set, catalog, seed=i * 2)
+        tmpl = _day_template(name, group_set, catalog, seed=i * 2, sets=sets, reps=reps, rest=rest)
         tmpl["order"] = i
         plan_days.append(tmpl)
+
+    _rename_duplicate_days(plan_days, catalog)
 
     return {
         "ok": True,
