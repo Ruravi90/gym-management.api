@@ -5,12 +5,15 @@ Ollama, etc.) configurable vía variables de entorno. Si no hay API key configur
 responde con una respuesta por reglas para que la función no rompa.
 """
 import json
+import logging
 import re
 import unicodedata
 from typing import List, Optional
 
 import httpx
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 SYSTEM_PROMPT = (
@@ -115,6 +118,7 @@ async def _call_llm(system_prompt: str, context: str, user_message: str, max_tok
             reply = data["choices"][0]["message"]["content"].strip()
             return {"reply": reply, "provider": settings.OPENAI_MODEL}
     except Exception as e:  # noqa: BLE001 - respuesta amigable ante cualquier fallo
+        logger.exception("LLM call failed")
         return {
             "reply": (
                 "No pude conectarme con la IA en este momento. "
@@ -243,7 +247,7 @@ async def generate_routine_plan(
     bmi = None
     if height_cm and weight_kg:
         m = height_cm / 100.0
-        bmi = round(weight_kg / (m * m), 1)
+        bmi = round(float(weight_kg) / (m * m), 1)
 
     profile_lines = [f"Tipo de cuerpo: {body_type}. {body_info}"]
     if age:
@@ -350,7 +354,7 @@ def build_client_context(
         lines.append(f"Altura: {height_cm} cm.")
     if height_cm and weight_kg:
         m = height_cm / 100.0
-        bmi = round(weight_kg / (m * m), 1)
+        bmi = round(float(weight_kg) / (m * m), 1)
         lines.append(f"IMC: {_bmi_category(bmi)}.")
 
     active = [r for r in routines if r.is_active]

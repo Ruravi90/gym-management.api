@@ -1,9 +1,13 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from app import crud, schemas
 from app.utils.auth import get_current_user
 from app.models.user import User
 from app.models.client import Client
 from app.services import mentor as mentor_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -78,6 +82,7 @@ async def mentor_chat(
         result = await mentor_service.mentor_chat(request.message, context)
         return schemas.routine.MentorResponse(**result)
     except Exception as e:
+        logger.exception("Error in /mentor/chat")
         return schemas.routine.MentorResponse(
             reply="No pude procesar tu mensaje en este momento. Inténtalo de nuevo en unos segundos. 💪",
             provider=None,
@@ -95,6 +100,7 @@ async def weekly_checkin(
         result = await mentor_service.weekly_checkin(context)
         return schemas.routine.MentorResponse(**result)
     except Exception as e:
+        logger.exception("Error in /mentor/weekly-checkin")
         return schemas.routine.MentorResponse(
             reply="No pude generar tu reporte semanal en este momento. Inténtalo de nuevo en unos segundos. 💪",
             provider=None,
