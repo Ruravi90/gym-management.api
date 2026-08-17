@@ -75,6 +75,18 @@ async def get_my_sessions(
     return await crud.routine.get_client_sessions(client_id=client.id, limit=limit)
 
 
+@router.get("/sessions/active", response_model=Optional[schemas.routine.WorkoutSessionResponse])
+async def get_active_session(
+    routine_id: int = Query(...),
+    day_id: int = Query(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Busca una sesión activa (status='pending') para reanudar."""
+    client = await get_current_client(current_user)
+    session = await crud.routine.get_active_session(client.id, routine_id, day_id)
+    return session
+
+
 @router.post("/sessions", response_model=schemas.routine.WorkoutSessionResponse, status_code=201)
 async def create_session(
     session: schemas.routine.WorkoutSessionCreate,

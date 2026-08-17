@@ -180,6 +180,18 @@ async def get_session(session_id: int) -> Optional[WorkoutSession]:
     return await _load_session(session_id)
 
 
+async def get_active_session(client_id: int, routine_id: int, day_id: int) -> Optional[WorkoutSession]:
+    session = await WorkoutSession.filter(
+        client_id=client_id,
+        routine_id=routine_id,
+        day_id=day_id,
+        status="pending",
+    ).order_by("-id").first()
+    if session:
+        return await _load_session(session.id)
+    return None
+
+
 async def create_session(client_id: int, data: WorkoutSessionCreate) -> WorkoutSession:
     session = await WorkoutSession.create(
         client_id=client_id,
