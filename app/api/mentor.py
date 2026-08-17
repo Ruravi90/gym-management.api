@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from app import crud, schemas
@@ -71,25 +71,6 @@ async def _profile_response(client: Client, current_user: User):
     )
 
 
-@router.post("/chat", response_model=schemas.routine.MentorResponse)
-async def mentor_chat(
-    request: schemas.routine.MentorRequest,
-    current_user: User = Depends(get_current_user),
-):
-    """Chatea con el mentor IA. Usa la rutina, el progreso y las medidas del cliente como contexto."""
-    try:
-        client = await get_current_client(current_user)
-        context = await _build_context(client, current_user)
-        result = await mentor_service.mentor_chat(request.message, context)
-        return schemas.routine.MentorResponse(**result)
-    except Exception as e:
-        logger.exception("Error in /mentor/chat")
-        return schemas.routine.MentorResponse(
-            reply="No pude procesar tu mensaje en este momento. Inténtalo de nuevo en unos segundos. 💪",
-            provider=None,
-        )
-
-
 @router.post("/weekly-checkin", response_model=schemas.routine.MentorResponse)
 async def weekly_checkin(
     current_user: User = Depends(get_current_user),
@@ -97,8 +78,29 @@ async def weekly_checkin(
     """Genera el reporte semanal: medidas vs semana anterior + adherencia a la rutina + recomendaciones."""
     try:
         client = await get_current_client(current_user)
+
+        # Rate limit: 1 reporte por semana
+        now = datetime.now()
+        if client.last_weekly_checkin_at:
+            days_since = (now - client.last_weekly_checkin_at).days
+            if days_since < 7:
+                days_left = 7 - days_since
+                return schemas.routine.MentorResponse(
+                    reply=(
+                        f"📋 Ya generaste tu reporte semanal esta semana. "
+                        f"Volvé a generarlo en {days_left} día(s). "
+                        f"Un reporte por semana es suficiente para medir tu progreso. 💪"
+                    ),
+                    provider=None,
+                )
+
         context = await _build_context(client, current_user)
         result = await mentor_service.weekly_checkin(context)
+
+        # Registrar la fecha del checkin
+        client.last_weekly_checkin_at = now
+        await client.save(update_fields=["last_weekly_checkin_at"])
+
         return schemas.routine.MentorResponse(**result)
     except Exception as e:
         logger.exception("Error in /mentor/weekly-checkin")

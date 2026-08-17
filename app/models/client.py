@@ -11,6 +11,7 @@ class Client(Model):
     membership_type = fields.CharField(max_length=50, null=True)  # basic, premium, vip
     status = fields.BooleanField(default=True)
     user = fields.ForeignKeyField("models.User", related_name="client_profile", null=True, on_delete=fields.SET_NULL)
+    last_weekly_checkin_at = fields.DatetimeField(null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
     
