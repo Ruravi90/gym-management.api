@@ -20,6 +20,8 @@ class User(Model):
     role = fields.CharEnumField(UserRoleEnum, default=UserRoleEnum.USER)
     hashed_password = fields.CharField(max_length=100)
     status = fields.BooleanField(default=True)
+    # Tipo de cuerpo (ectomorph | mesomorph | endomorph) usado por el mentor IA
+    body_type = fields.CharField(max_length=20, null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
     

@@ -4,6 +4,11 @@ Usa una API de chat completions compatible con OpenAI (OpenAI, Groq, OpenRouter,
 Ollama, etc.) configurable vía variables de entorno. Si no hay API key configurada,
 responde con una respuesta por reglas para que la función no rompa.
 """
+import json
+import re
+import unicodedata
+from typing import List, Optional
+
 import httpx
 from app.config import settings
 
@@ -14,6 +19,40 @@ SYSTEM_PROMPT = (
     "series, repeticiones, descansos, progresión de peso y constancia. "
     "Respondes de forma breve (máx. 150 palabras), con tono motivador y directo. "
     "Si te preguntan por algo fuera de fitness/entrenamiento, redirige amablemente al tema."
+)
+
+
+BODY_TYPE_INFO = {
+    "ectomorph": (
+        "Ectomorfo: complexión delgada y metabolismo rápido; te cuesta subir de peso. "
+        "Estrategia: más calorías, menos cardio, series pesadas de 6-10 reps y descansos largos."
+    ),
+    "mesomorph": (
+        "Mesomorfo: complexión atlética; ganas músculo y pierdes grasa con facilidad. "
+        "Estrategia: equilibrio perfecto entre fuerza e hipertrofia, 8-12 reps, descansos medios."
+    ),
+    "endomorph": (
+        "Endomorfo: tendencia a acumular grasa; ganas músculo fácil pero también peso. "
+        "Estrategia: prioriza la definición, 10-15 reps, descansos cortos y cardio extra."
+    ),
+}
+
+
+ROUTINE_GENERATION_PROMPT = (
+    "Eres 'FitMentor', un coach de fitness que diseña rutinas de entrenamiento semanales. "
+    "Debes generar una rutina personalizada en ESPAÑOL considerando el tipo de cuerpo, el "
+    "objetivo, los días disponibles, el equipamiento y la experiencia del cliente.\n"
+    "REGLAS:\n"
+    "- Usa ÚNICAMENTE ejercicios de la lista de ejercicios disponibles que se te da (elige "
+    "el nombre EXACTO tal y como aparece en la lista).\n"
+    "- Diseña exactamente {days_per_week} día(s) de entrenamiento, con 4 a 6 ejercicios por día.\n"
+    "- Distribuye los grupos musculares con sentido (ej. push/pull/legs o torso/pierna).\n"
+    "- El número de series, reps y descanso debe adaptarse al tipo de cuerpo y objetivo.\n"
+    "- Responde ÚNICAMENTE con un JSON válido (sin texto extra, sin markdown) con este formato:\n"
+    '{"name": "Mi rutina X días", "description": "breve descripción", '
+    '"days": [{"name": "Día 1 - ...", "exercises": '
+    '[{"exercise": "Nombre exacto del ejercicio", "sets": 4, "reps": "8-12", '
+    '"rest_seconds": 90, "notes": "nota breve"}]}]}'
 )
 
 
@@ -42,10 +81,16 @@ async def _call_llm(system_prompt: str, context: str, user_message: str, max_tok
             "provider": None,
         }
 
-    url = f"{settings.OPENAI_BASE_URL.rstrip('/')}/chat/completions"
+    # Tolerar que la base ya incluya "/chat/completions" (p. ej. si el usuario
+    # copió la URL completa del endpoint en OPENAI_BASE_URL)
+    base = settings.OPENAI_BASE_URL.rstrip("/")
+    url = base if base.endswith("/chat/completions") else f"{base}/chat/completions"
     headers = {
         "Authorization": f"Bearer {settings.OPENAI_API_KEY}",
         "Content-Type": "application/json",
+        # Headers recomendados por OpenRouter para identificar la app
+        "HTTP-Referer": "https://gymcontrol.app",
+        "X-Title": "GymControl FitMentor",
     }
     messages = [{"role": "system", "content": system_prompt}]
     if context:
@@ -94,9 +139,154 @@ async def weekly_checkin(context: str = "") -> dict:
     )
 
 
-def build_client_context(client, routines, recent_sessions, measurements=None) -> str:
+# =====================================================================
+# Generación de rutinas con IA
+# =====================================================================
+def _parse_json_reply(text: str) -> Optional[dict]:
+    """Extrae el primer objeto JSON de la respuesta del LLM (tolera markdown y texto extra)."""
+    if not text:
+        return None
+    cleaned = text.strip()
+    # Quitar cercos de código markdown ```json ... ```
+    cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.IGNORECASE)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+    # Buscar el primer { ... } balanceado
+    start = cleaned.find("{")
+    if start == -1:
+        return None
+    depth = 0
+    for i in range(start, len(cleaned)):
+        ch = cleaned[i]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                try:
+                    return json.loads(cleaned[start:i + 1])
+                except json.JSONDecodeError:
+                    return None
+    return None
+
+
+def _norm(s: Optional[str]) -> str:
+    """Normaliza un texto: minúsculas, sin tildes y sin símbolos, para comparar nombres."""
+    s = unicodedata.normalize("NFKD", s or "")
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return re.sub(r"[^a-z0-9 ]", "", s.lower()).strip()
+
+
+def match_exercise(name: str, catalog: List) -> Optional[dict]:
+    """Busca un ejercicio del catálogo por nombre (exacto, contención o tokens)."""
+    n = _norm(name)
+    if not n:
+        return None
+    for ex in catalog:
+        if _norm(ex.name) == n:
+            return ex
+    for ex in catalog:
+        en = _norm(ex.name)
+        if n in en or en in n:
+            return ex
+    toks = set(n.split())
+    for ex in catalog:
+        if toks and toks <= set(_norm(ex.name).split()):
+            return ex
+    return None
+
+
+async def generate_routine_plan(
+    body_type: str,
+    goal: str,
+    days_per_week: int,
+    equipment: Optional[str],
+    experience: Optional[str],
+    duration_minutes: Optional[int],
+    catalog: List,
+) -> dict:
+    """Pide al LLM una rutina semanal en JSON y devuelve {"ok", "plan"|, "reply"}."""
+    if not settings.OPENAI_API_KEY:
+        return {
+            "ok": False,
+            "reply": (
+                "⚠️ El mentor IA no está configurado todavía. Pide al administrador que "
+                "agregue OPENAI_API_KEY al backend y podré diseñar tu rutina personalizada."
+            ),
+        }
+
+    body_info = BODY_TYPE_INFO.get(body_type, BODY_TYPE_INFO["mesomorph"])
+    catalog_lines = "\n".join(
+        f"- {ex.name} ({ex.muscle_group or 'general'}, {ex.equipment or 'sin equipo'})"
+        for ex in catalog
+    )
+    user_message = (
+        f"Tipo de cuerpo: {body_type}. {body_info}\n"
+        f"Objetivo: {goal or 'general'}. Días por semana: {days_per_week}. "
+        f"Equipamiento: {equipment or 'gimnasio'}. Experiencia: {experience or 'principiante'}. "
+        f"Duración por sesión: {duration_minutes or 60} minutos.\n"
+        f"Ejercicios disponibles (elige de aquí):\n{catalog_lines}\n"
+        "Genera la rutina."
+    )
+
+    result = await _call_llm(ROUTINE_GENERATION_PROMPT, "", user_message, max_tokens=1500)
+    plan = _parse_json_reply(result.get("reply", ""))
+    if not plan or not isinstance(plan, dict) or not plan.get("days"):
+        return {
+            "ok": False,
+            "reply": (
+                "🤔 No pude estructurar tu rutina esta vez. Inténtalo de nuevo en unos "
+                "segundos o reformula tu objetivo."
+            ),
+        }
+
+    # Normalizar el plan: números y campos por defecto
+    days = []
+    for day in plan.get("days", []):
+        exercises = []
+        for i, ex in enumerate(day.get("exercises", [])):
+            matched = match_exercise(ex.get("exercise", ""), catalog)
+            if not matched:
+                continue
+            exercises.append(
+                {
+                    "exercise_id": matched.id,
+                    "sets": int(ex.get("sets") or 3),
+                    "reps": str(ex.get("reps") or "10"),
+                    "rest_seconds": int(ex.get("rest_seconds") or 60),
+                    "notes": ex.get("notes") or None,
+                    "order": i,
+                }
+            )
+        if exercises:
+            days.append(
+                {
+                    "name": day.get("name") or f"Día {len(days) + 1}",
+                    "day_of_week": None,
+                    "order": len(days),
+                    "exercises": exercises,
+                }
+            )
+
+    if not days:
+        return {
+            "ok": False,
+            "reply": "😅 No encontré ejercicios de mi catálogo en la propuesta. Inténtalo de nuevo.",
+        }
+
+    plan["name"] = plan.get("name") or f"Mi rutina de {days_per_week} días"
+    plan["days"] = days
+    return {"ok": True, "plan": plan, "provider": result.get("provider")}
+
+
+def build_client_context(client, routines, recent_sessions, measurements=None, body_type=None) -> str:
     """Construye un resumen del estado del cliente para dar contexto al LLM."""
     lines = [f"Cliente: {client.name}", f"Tipo de membresía: {client.membership_type or 'N/A'}"]
+    if body_type:
+        info = BODY_TYPE_INFO.get(body_type)
+        lines.append(f"Tipo de cuerpo: {body_type}" + (f" ({info})" if info else ""))
 
     active = [r for r in routines if r.is_active]
     if active:

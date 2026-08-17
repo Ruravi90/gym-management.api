@@ -191,3 +191,35 @@ class MentorRequest(BaseModel):
 class MentorResponse(BaseModel):
     reply: str
     provider: Optional[str] = None
+
+
+BODY_TYPES = {"ectomorph", "mesomorph", "endomorph"}
+
+
+class BodyTypeRequest(BaseModel):
+    body_type: str = Field(min_length=1, max_length=20)
+
+
+class BodyTypeResponse(BaseModel):
+    body_type: Optional[str] = None
+    reply: str
+
+
+class RoutineGenerationRequest(BaseModel):
+    # Si no se envía, se usa el tipo de cuerpo guardado en el perfil
+    body_type: Optional[str] = None
+    goal: str = Field(default="general", max_length=50)
+    days_per_week: int = Field(default=3, ge=1, le=6)
+    equipment: Optional[str] = Field(default=None, max_length=50)
+    experience: Optional[str] = Field(default=None, max_length=50)
+    duration_minutes: Optional[int] = Field(default=60, ge=15, le=180)
+
+
+class RoutineGenerationResponse(BaseModel):
+    ok: bool
+    # True cuando el mentor necesita que el cliente elija su tipo de cuerpo primero
+    ask_body_type: bool = False
+    reply: str
+    provider: Optional[str] = None
+    routine_id: Optional[int] = None
+    routine_name: Optional[str] = None

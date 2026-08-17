@@ -70,7 +70,11 @@ uvicorn app.main:app --reload
 - **Rutinas** (`/routines`): el staff crea rutinas con días y ejercicios (series/reps/peso/descanso) y las asigna a clientes; los clientes también pueden crear las suyas.
 - **Seguimiento** (`/routines/sessions` y `/sets`): el cliente inicia una sesión, registra sus series (reps, peso, completada) y la cierra con duración.
 - **Medidas corporales** (`/measurements`): registro semanal de cintura, abdomen bajo, pierna y brazos (cm) con deltas automáticos vs el registro anterior.
-- **Mentor IA** (`/mentor/chat` y `/mentor/weekly-checkin`): chat con contexto de la rutina, progreso y medidas; y **reporte semanal** generado con IA (medidas vs semana anterior + adherencia + recomendaciones).
+- **Mentor IA**:
+  - `/mentor/chat`: chat con contexto de la rutina, progreso, medidas y tipo de cuerpo.
+  - `/mentor/weekly-checkin`: **reporte semanal** generado con IA (medidas vs semana anterior + adherencia + recomendaciones).
+  - `/mentor/body-type` (GET/POST): guarda el **tipo de cuerpo** del cliente (`ectomorph`, `mesomorph` o `endomorph`), que la IA usa para adaptar series/reps/descanso.
+  - `/mentor/generate-routine`: la IA **genera una rutina personalizada** (pregunta primero el tipo de cuerpo si no lo conoce), la mapea al catálogo real de ejercicios y la crea en la BD con GIFs y seguimiento. Al generar una nueva, las anteriores se desactivan.
 
 ## 📚 Documentación API
 

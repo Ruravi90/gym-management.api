@@ -132,6 +132,10 @@ async def startup_event():
             await conn.execute_query("ALTER TABLE `kaizen_logs` ADD COLUMN `reflection` LONGTEXT")
             logger.info("✅ Added reflection to kaizen_logs")
         except: pass
+        try:
+            await conn.execute_query("ALTER TABLE `users` ADD COLUMN `body_type` VARCHAR(20)")
+            logger.info("✅ Added body_type to users")
+        except: pass
 
         command = Command(tortoise_config=TORTOISE_CONFIG, app="models")
         await command.init()
