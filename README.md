@@ -73,8 +73,9 @@ uvicorn app.main:app --reload
 - **Mentor IA**:
   - `/mentor/chat`: chat con contexto de la rutina, progreso, medidas y tipo de cuerpo.
   - `/mentor/weekly-checkin`: **reporte semanal** generado con IA (medidas vs semana anterior + adherencia + recomendaciones).
+  - `/mentor/profile` (GET/POST): **perfil físico del cliente** — tipo de cuerpo, **altura**, peso, edad, sexo, actividad diaria y lesiones (lo que un instructor pregunta antes de asignar una rutina). Calcula el **IMC** con la altura y el último peso.
   - `/mentor/body-type` (GET/POST): guarda el **tipo de cuerpo** del cliente (`ectomorph`, `mesomorph` o `endomorph`), que la IA usa para adaptar series/reps/descanso.
-  - `/mentor/generate-routine`: la IA **genera una rutina personalizada** (pregunta primero el tipo de cuerpo si no lo conoce), la mapea al catálogo real de ejercicios y la crea en la BD con GIFs y seguimiento. Al generar una nueva, las anteriores se desactivan.
+  - `/mentor/generate-routine`: recibe **todo el intake del instructor** (perfil físico + objetivo + días + equipamiento + experiencia + lesiones), la IA **genera la rutina personalizada** (pregunta primero el tipo de cuerpo si no lo conoce), la mapea al catálogo real de ejercicios y la crea en la BD con GIFs y seguimiento. El peso del intake se guarda como medición de hoy. Al generar una nueva, las anteriores se desactivan.
 
 ## 📚 Documentación API
 

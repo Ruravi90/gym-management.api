@@ -205,9 +205,24 @@ class BodyTypeResponse(BaseModel):
     reply: str
 
 
-class RoutineGenerationRequest(BaseModel):
-    # Si no se envía, se usa el tipo de cuerpo guardado en el perfil
+class ProfileUpdate(BaseModel):
+    """Datos del perfil físico que un instructor pregunta antes de asignar una rutina."""
     body_type: Optional[str] = None
+    height_cm: Optional[float] = Field(default=None, ge=80, le=250)
+    weight_kg: Optional[float] = Field(default=None, ge=20, le=400)  # peso actual (se guarda como medición de hoy)
+    age: Optional[int] = Field(default=None, ge=13, le=100)
+    sex: Optional[str] = Field(default=None, max_length=10)
+    daily_activity: Optional[str] = Field(default=None, max_length=20)
+    injuries: Optional[str] = Field(default=None, max_length=500)
+
+
+class ProfileResponse(ProfileUpdate):
+    """Perfil físico + peso actual (última medición) e IMC calculado."""
+    bmi: Optional[float] = None
+
+
+class RoutineGenerationRequest(ProfileUpdate):
+    """Todo el intake del instructor: perfil físico + preferencias de entrenamiento."""
     goal: str = Field(default="general", max_length=50)
     days_per_week: int = Field(default=3, ge=1, le=6)
     equipment: Optional[str] = Field(default=None, max_length=50)

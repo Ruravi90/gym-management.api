@@ -198,6 +198,18 @@ def match_exercise(name: str, catalog: List) -> Optional[dict]:
     return None
 
 
+def _bmi_category(bmi: Optional[float]) -> Optional[str]:
+    if bmi is None:
+        return None
+    if bmi < 18.5:
+        return f"{bmi} (bajo peso)"
+    if bmi < 25:
+        return f"{bmi} (normal)"
+    if bmi < 30:
+        return f"{bmi} (sobrepeso)"
+    return f"{bmi} (obesidad)"
+
+
 async def generate_routine_plan(
     body_type: str,
     goal: str,
@@ -206,8 +218,18 @@ async def generate_routine_plan(
     experience: Optional[str],
     duration_minutes: Optional[int],
     catalog: List,
+    height_cm: Optional[float] = None,
+    weight_kg: Optional[float] = None,
+    age: Optional[int] = None,
+    sex: Optional[str] = None,
+    daily_activity: Optional[str] = None,
+    injuries: Optional[str] = None,
 ) -> dict:
-    """Pide al LLM una rutina semanal en JSON y devuelve {"ok", "plan"|, "reply"}."""
+    """Pide al LLM una rutina semanal en JSON y devuelve {"ok", "plan"|, "reply"}.
+
+    Recibe TODO el intake del instructor (perfil físico + preferencias) para
+    que la rutina se adapte a los objetivos y limitaciones del cliente.
+    """
     if not settings.OPENAI_API_KEY:
         return {
             "ok": False,
@@ -218,16 +240,42 @@ async def generate_routine_plan(
         }
 
     body_info = BODY_TYPE_INFO.get(body_type, BODY_TYPE_INFO["mesomorph"])
+    bmi = None
+    if height_cm and weight_kg:
+        m = height_cm / 100.0
+        bmi = round(weight_kg / (m * m), 1)
+
+    profile_lines = [f"Tipo de cuerpo: {body_type}. {body_info}"]
+    if age:
+        profile_lines.append(f"Edad: {age} años.")
+    if sex:
+        profile_lines.append(f"Sexo: {sex}.")
+    if height_cm:
+        profile_lines.append(f"Altura: {height_cm} cm.")
+    if weight_kg:
+        profile_lines.append(f"Peso actual: {weight_kg} kg.")
+    if bmi is not None:
+        profile_lines.append(f"IMC: {_bmi_category(bmi)}.")
+    if daily_activity:
+        profile_lines.append(f"Actividad diaria fuera del gym: {daily_activity}.")
+    if injuries:
+        profile_lines.append(
+            f"⚠️ LESIONES/LIMITACIONES IMPORTANTES: {injuries}. "
+            "Evita a toda costa ejercicios que puedan agravar estas lesiones."
+        )
+
     catalog_lines = "\n".join(
         f"- {ex.name} ({ex.muscle_group or 'general'}, {ex.equipment or 'sin equipo'})"
         for ex in catalog
     )
     user_message = (
-        f"Tipo de cuerpo: {body_type}. {body_info}\n"
-        f"Objetivo: {goal or 'general'}. Días por semana: {days_per_week}. "
+        "Perfil del cliente:\n" + "\n".join(profile_lines) + "\n\n"
+        f"Objetivo principal: {goal or 'general'}. Días por semana: {days_per_week}. "
         f"Equipamiento: {equipment or 'gimnasio'}. Experiencia: {experience or 'principiante'}. "
         f"Duración por sesión: {duration_minutes or 60} minutos.\n"
-        f"Ejercicios disponibles (elige de aquí):\n{catalog_lines}\n"
+        "Actúa como un instructor profesional y diseña una rutina segura y efectiva "
+        "para este perfil. Ejercicios disponibles (elige los nombres EXACTOS de aquí):\n"
+        f"{catalog_lines}\n"
         "Genera la rutina."
     )
 
@@ -281,12 +329,29 @@ async def generate_routine_plan(
     return {"ok": True, "plan": plan, "provider": result.get("provider")}
 
 
-def build_client_context(client, routines, recent_sessions, measurements=None, body_type=None) -> str:
+def build_client_context(
+    client,
+    routines,
+    recent_sessions,
+    measurements=None,
+    body_type=None,
+    height_cm=None,
+    age=None,
+    weight_kg=None,
+) -> str:
     """Construye un resumen del estado del cliente para dar contexto al LLM."""
     lines = [f"Cliente: {client.name}", f"Tipo de membresía: {client.membership_type or 'N/A'}"]
     if body_type:
         info = BODY_TYPE_INFO.get(body_type)
         lines.append(f"Tipo de cuerpo: {body_type}" + (f" ({info})" if info else ""))
+    if age:
+        lines.append(f"Edad: {age} años.")
+    if height_cm:
+        lines.append(f"Altura: {height_cm} cm.")
+    if height_cm and weight_kg:
+        m = height_cm / 100.0
+        bmi = round(weight_kg / (m * m), 1)
+        lines.append(f"IMC: {_bmi_category(bmi)}.")
 
     active = [r for r in routines if r.is_active]
     if active:

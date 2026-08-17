@@ -136,6 +136,26 @@ async def startup_event():
             await conn.execute_query("ALTER TABLE `users` ADD COLUMN `body_type` VARCHAR(20)")
             logger.info("✅ Added body_type to users")
         except: pass
+        try:
+            await conn.execute_query("ALTER TABLE `users` ADD COLUMN `height_cm` DOUBLE")
+            logger.info("✅ Added height_cm to users")
+        except: pass
+        try:
+            await conn.execute_query("ALTER TABLE `users` ADD COLUMN `age` INT")
+            logger.info("✅ Added age to users")
+        except: pass
+        try:
+            await conn.execute_query("ALTER TABLE `users` ADD COLUMN `sex` VARCHAR(10)")
+            logger.info("✅ Added sex to users")
+        except: pass
+        try:
+            await conn.execute_query("ALTER TABLE `users` ADD COLUMN `daily_activity` VARCHAR(20)")
+            logger.info("✅ Added daily_activity to users")
+        except: pass
+        try:
+            await conn.execute_query("ALTER TABLE `users` ADD COLUMN `injuries` LONGTEXT")
+            logger.info("✅ Added injuries to users")
+        except: pass
 
         command = Command(tortoise_config=TORTOISE_CONFIG, app="models")
         await command.init()

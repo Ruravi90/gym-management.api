@@ -24,8 +24,45 @@ async def _build_context(client: Client, current_user: User) -> str:
     routines = await crud.routine.get_client_routines(client_id=client.id, active_only=False)
     recent_sessions = await crud.routine.get_client_sessions(client_id=client.id, limit=10)
     measurements = await crud.measurement.list_measurements(client_id=client.id, limit=4)
+    latest_weight = measurements[0].weight_kg if measurements else None
     return mentor_service.build_client_context(
-        client, routines, recent_sessions, measurements, body_type=current_user.body_type
+        client,
+        routines,
+        recent_sessions,
+        measurements,
+        body_type=current_user.body_type,
+        height_cm=current_user.height_cm,
+        age=current_user.age,
+        weight_kg=latest_weight,
+    )
+
+
+async def _save_profile(current_user: User, data: dict) -> None:
+    """Guarda los campos de perfil físico enviados (solo los que vienen)."""
+    allowed = ("body_type", "height_cm", "age", "sex", "daily_activity", "injuries")
+    update = {k: v for k, v in data.items() if k in allowed and v is not None}
+    if update:
+        await current_user.update_from_dict(update)
+        await current_user.save()
+
+
+async def _profile_response(client: Client, current_user: User):
+    """Perfil físico + peso actual (última medición) + IMC."""
+    measurements = await crud.measurement.list_measurements(client_id=client.id, limit=1)
+    weight = float(measurements[0].weight_kg) if measurements and measurements[0].weight_kg is not None else None
+    bmi = None
+    if current_user.height_cm and weight:
+        m = current_user.height_cm / 100.0
+        bmi = round(weight / (m * m), 1)
+    return schemas.routine.ProfileResponse(
+        body_type=current_user.body_type,
+        height_cm=current_user.height_cm,
+        age=current_user.age,
+        sex=current_user.sex,
+        daily_activity=current_user.daily_activity,
+        injuries=current_user.injuries,
+        weight_kg=weight,
+        bmi=bmi,
     )
 
 
@@ -92,6 +129,34 @@ async def save_body_type(
     )
 
 
+@router.get("/profile", response_model=schemas.routine.ProfileResponse)
+async def get_profile(
+    current_user: User = Depends(get_current_user),
+):
+    """Perfil físico del cliente: tipo de cuerpo, altura, edad, sexo, actividad y lesiones."""
+    client = await get_current_client(current_user)
+    return await _profile_response(client, current_user)
+
+
+@router.post("/profile", response_model=schemas.routine.ProfileResponse)
+async def save_profile(
+    request: schemas.routine.ProfileUpdate,
+    current_user: User = Depends(get_current_user),
+):
+    """Guarda (parcialmente) el perfil físico del cliente."""
+    data = request.model_dump(exclude_unset=True)
+    if data.get("body_type"):
+        data["body_type"] = data["body_type"].strip().lower()
+        if data["body_type"] not in schemas.routine.BODY_TYPES:
+            raise HTTPException(
+                status_code=400,
+                detail="Tipo de cuerpo inválido. Usa: ectomorph, mesomorph o endomorph.",
+            )
+    await _save_profile(current_user, data)
+    client = await get_current_client(current_user)
+    return await _profile_response(client, current_user)
+
+
 @router.post("/generate-routine", response_model=schemas.routine.RoutineGenerationResponse)
 async def generate_routine(
     request: schemas.routine.RoutineGenerationRequest,
@@ -125,10 +190,18 @@ async def generate_routine(
             ),
         )
 
-    # Guardar el tipo de cuerpo para futuras rutinas/reportes
-    if current_user.body_type != body_type:
-        current_user.body_type = body_type
-        await current_user.save(update_fields=["body_type", "updated_at"])
+    # Guardar el intake del instructor en el perfil
+    profile_data = request.model_dump(exclude_unset=True)
+    profile_data["body_type"] = body_type
+    await _save_profile(current_user, profile_data)
+
+    # Guardar el peso del intake como medición de hoy (si se indicó) para el IMC
+    if request.weight_kg is not None:
+        from datetime import date as date_cls
+        await crud.measurement.upsert_measurement(
+            client_id=client.id,
+            data=schemas.measurement.BodyMeasurementCreate(date=date_cls.today(), weight_kg=request.weight_kg),
+        )
 
     catalog = await crud.routine.list_exercises()
     if not catalog:
@@ -136,6 +209,10 @@ async def generate_routine(
             ok=False,
             reply="Aún no hay ejercicios en el catálogo. Pide al administrador que ejecute el seeder.",
         )
+
+    # Peso actual: el del intake o la última medición registrada
+    latest = await crud.measurement.list_measurements(client_id=client.id, limit=1)
+    weight_kg = request.weight_kg if request.weight_kg is not None else (latest[0].weight_kg if latest else None)
 
     result = await mentor_service.generate_routine_plan(
         body_type=body_type,
@@ -145,6 +222,12 @@ async def generate_routine(
         experience=request.experience,
         duration_minutes=request.duration_minutes,
         catalog=catalog,
+        height_cm=request.height_cm or current_user.height_cm,
+        weight_kg=weight_kg,
+        age=request.age or current_user.age,
+        sex=request.sex or current_user.sex,
+        daily_activity=request.daily_activity or current_user.daily_activity,
+        injuries=request.injuries or current_user.injuries,
     )
 
     if not result.get("ok"):
