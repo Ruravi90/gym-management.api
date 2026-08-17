@@ -16,63 +16,34 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
-SYSTEM_PROMPT = (
-    "Eres 'FitMentor', un coach de fitness motivador y práctico que habla español. "
-    "Ayudas a clientes de un gimnasio a seguir sus rutinas: aconsejas sobre técnica, "
-    "series, repeticiones, descansos, progresión de peso y constancia. "
-    "Respondes de forma breve (máx. 150 palabras), con tono motivador y directo. "
-    "Si te preguntan por algo fuera de fitness/entrenamiento, redirige amablemente al tema."
-)
-
-
 BODY_TYPE_INFO = {
-    "ectomorph": (
-        "Ectomorfo: complexión delgada y metabolismo rápido; te cuesta subir de peso. "
-        "Estrategia: más calorías, menos cardio, series pesadas de 6-10 reps y descansos largos."
-    ),
-    "mesomorph": (
-        "Mesomorfo: complexión atlética; ganas músculo y pierdes grasa con facilidad. "
-        "Estrategia: equilibrio perfecto entre fuerza e hipertrofia, 8-12 reps, descansos medios."
-    ),
-    "endomorph": (
-        "Endomorfo: tendencia a acumular grasa; ganas músculo fácil pero también peso. "
-        "Estrategia: prioriza la definición, 10-15 reps, descansos cortos y cardio extra."
-    ),
+    "ectomorph": "Delgado, metabolismo rápido. Series pesadas 6-10 reps, poco cardio.",
+    "mesomorph": "Atlético, gana músculo fácil. 8-12 reps, equilibrio fuerza/hipertrofia.",
+    "endomorph": "Tiende a acumular grasa. 10-15 reps, cardio extra, descansos cortos.",
 }
 
 
 ROUTINE_GENERATION_PROMPT = (
-    "Eres 'FitMentor', un coach de fitness que diseña rutinas de entrenamiento semanales. "
-    "Debes generar una rutina personalizada en ESPAÑOL considerando el tipo de cuerpo, el "
-    "objetivo, los días disponibles, el equipamiento y la experiencia del cliente.\n"
+    "Coach de fitness. Diseña rutinas semanales en ESPAÑOL.\n"
     "REGLAS:\n"
-    "- Usa ÚNICAMENTE ejercicios de la lista de ejercicios disponibles que se te da (elige "
-    "el nombre EXACTO tal y como aparece en la lista).\n"
-    "- Diseña exactamente {days_per_week} día(s) de entrenamiento, con 4 a 6 ejercicios por día.\n"
-    "- Distribuye los grupos musculares con sentido (ej. push/pull/legs o torso/pierna).\n"
-    "- El número de series, reps y descanso debe adaptarse al tipo de cuerpo y objetivo.\n"
-    "- Responde ÚNICAMENTE con un JSON válido (sin texto extra, sin markdown) con este formato:\n"
-    '{"name": "Mi rutina X días", "description": "breve descripción", '
-    '"days": [{"name": "Día 1 - ...", "exercises": '
-    '[{"exercise": "Nombre exacto del ejercicio", "sets": 4, "reps": "8-12", '
-    '"rest_seconds": 90, "notes": "nota breve"}]}]}'
+    "- Usa SOLO ejercicios de la lista disponible (nombre EXACTO).\n"
+    "- Exactamente {days_per_week} día(s), 4-6 ejercicios por día.\n"
+    "- Adapta series/reps/descanso al tipo de cuerpo y objetivo.\n"
+    "- Responde SOLO JSON válido:\n"
+    '{"name":"Mi rutina X días","description":"breve",'
+    '"days":[{"name":"Día 1 - ...","exercises":'
+    '[{"exercise":"Nombre","sets":4,"reps":"8-12","rest_seconds":90,"notes":"nota"}]}]}'
 )
 
 
 WEEKLY_CHECKIN_PROMPT = (
-    "Eres 'FitMentor', un coach de fitness motivador que habla español. "
-    "Genera un REPORTE SEMANAL para el cliente con base en sus medidas corporales, su rutina "
-    "y sus sesiones de la última semana. Estructura tu respuesta así:\n"
-    "1) 📏 **Resumen de medidas**: cambios respecto a la semana anterior (qué mejoró y qué no).\n"
-    "2) 🏋️ **Adherencia a la rutina**: cuántas sesiones hizo y cómo va su constancia.\n"
-    "3) 💡 **Recomendaciones**: 2-3 acciones concretas y realistas para la próxima semana "
-    "(ajustes de peso, series, descanso o hábitos).\n"
-    "4) 🔄 **¿Cambiar la rutina?**: al final, indica con claridad si el cliente debe:\n"
-    "   - **Continuar** con su rutina actual (si va bien, es consistente y el progreso es positivo).\n"
-    "   - **Considerar un cambio** de rutina (si lleva más de 4 semanas sin progreso, "
-    "el progreso se estancó, o el cuerpo ya se adaptó).\n"
-    "   Sé honesto y directo. No sugieras cambiar sin razón.\n"
-    "Usa formato **markdown** (negritas, listas, emojis). Máximo 250 palabras, tono motivador."
+    "Coach de fitness. Genera REPORTE SEMANAL en español con markdown.\n"
+    "Estructura:\n"
+    "1) 📏 **Medidas**: cambios vs semana anterior.\n"
+    "2) 🏋️ **Adherencia**: sesiones hechas y constancia.\n"
+    "3) 💡 **Recomendaciones**: 2-3 acciones concretas.\n"
+    "4) 🔄 **¿Cambiar rutina?**: continuar o considerar cambio (si 4+ semanas sin progreso).\n"
+    "Máx 200 palabras, tono motivador."
 )
 
 
@@ -104,7 +75,7 @@ async def _call_llm(system_prompt: str, context: str, user_message: str, max_tok
     if context:
         messages.append({
             "role": "system",
-            "content": "Contexto del cliente (rutina, progreso y medidas):\n" + context,
+            "content": "Contexto:\n" + context,
         })
     messages.append({"role": "user", "content": user_message})
 
@@ -144,7 +115,7 @@ async def weekly_checkin(context: str = "") -> dict:
         WEEKLY_CHECKIN_PROMPT,
         context,
         "Genera mi reporte semanal de progreso.",
-        max_tokens=500,
+        max_tokens=400,
     )
 
 
@@ -254,41 +225,29 @@ async def generate_routine_plan(
         m = height_cm / 100.0
         bmi = round(float(weight_kg) / (m * m), 1)
 
-    profile_lines = [f"Tipo de cuerpo: {body_type}. {body_info}"]
+    profile_parts = [f"{body_type}. {body_info}"]
     if age:
-        profile_lines.append(f"Edad: {age} años.")
+        profile_parts.append(f"{age}a")
     if sex:
-        profile_lines.append(f"Sexo: {sex}.")
-    if height_cm:
-        profile_lines.append(f"Altura: {height_cm} cm.")
-    if weight_kg:
-        profile_lines.append(f"Peso actual: {weight_kg} kg.")
+        profile_parts.append(sex)
+    if height_cm and weight_kg:
+        profile_parts.append(f"{height_cm}cm/{weight_kg}kg")
     if bmi is not None:
-        profile_lines.append(f"IMC: {_bmi_category(bmi)}.")
+        profile_parts.append(f"IMC:{_bmi_category(bmi)}")
     if daily_activity:
-        profile_lines.append(f"Actividad diaria fuera del gym: {daily_activity}.")
+        profile_parts.append(f"act:{daily_activity}")
     if injuries:
-        profile_lines.append(
-            f"⚠️ LESIONES/LIMITACIONES IMPORTANTES: {injuries}. "
-            "Evita a toda costa ejercicios que puedan agravar estas lesiones."
-        )
+        profile_parts.append(f"LESIONES:{injuries}")
 
-    catalog_lines = "\n".join(
-        f"- {ex.name} ({ex.muscle_group or 'general'}, {ex.equipment or 'sin equipo'})"
-        for ex in catalog
-    )
     user_message = (
-        "Perfil del cliente:\n" + "\n".join(profile_lines) + "\n\n"
-        f"Objetivo principal: {goal or 'general'}. Días por semana: {days_per_week}. "
-        f"Equipamiento: {equipment or 'gimnasio'}. Experiencia: {experience or 'principiante'}. "
-        f"Duración por sesión: {duration_minutes or 60} minutos.\n"
-        "Actúa como un instructor profesional y diseña una rutina segura y efectiva "
-        "para este perfil. Ejercicios disponibles (elige los nombres EXACTOS de aquí):\n"
-        f"{catalog_lines}\n"
-        "Genera la rutina."
+        f"Perfil: {', '.join(profile_parts)}. "
+        f"Objetivo:{goal or 'general'}. Días:{days_per_week}. "
+        f"Equipo:{equipment or 'gimnasio'}. Exp:{experience or 'principiante'}. "
+        f"Duración:{duration_minutes or 60}min.\n"
+        f"Ejercicios (nombres EXACTOS):\n{catalog_lines}"
     )
 
-    result = await _call_llm(ROUTINE_GENERATION_PROMPT, "", user_message, max_tokens=1500)
+    result = await _call_llm(ROUTINE_GENERATION_PROMPT, "", user_message, max_tokens=1200)
     plan = _parse_json_reply(result.get("reply", ""))
     if not plan or not isinstance(plan, dict) or not plan.get("days"):
         return {
@@ -349,56 +308,49 @@ def build_client_context(
     weight_kg=None,
 ) -> str:
     """Construye un resumen del estado del cliente para dar contexto al LLM."""
-    lines = [f"Cliente: {client.name}", f"Tipo de membresía: {client.membership_type or 'N/A'}"]
+    lines = []
     if body_type:
-        info = BODY_TYPE_INFO.get(body_type)
-        lines.append(f"Tipo de cuerpo: {body_type}" + (f" ({info})" if info else ""))
+        lines.append(f"Cuerpo: {body_type}. {BODY_TYPE_INFO.get(body_type, '')}")
     if age:
-        lines.append(f"Edad: {age} años.")
-    if height_cm:
-        lines.append(f"Altura: {height_cm} cm.")
+        lines.append(f"Edad: {age}a")
     if height_cm and weight_kg:
         m = height_cm / 100.0
         bmi = round(float(weight_kg) / (m * m), 1)
-        lines.append(f"IMC: {_bmi_category(bmi)}.")
+        lines.append(f"Altura: {height_cm}cm, Peso: {weight_kg}kg, IMC: {_bmi_category(bmi)}")
 
     active = [r for r in routines if r.is_active]
     if active:
-        lines.append("Rutinas activas:")
-        for r in active[:3]:
-            day_names = ", ".join(d.name for d in r.days) if r.days else "sin días definidos"
-            lines.append(f"  - {r.name} ({day_names})")
+        for r in active[:2]:
+            days = ", ".join(d.name for d in r.days[:4]) if r.days else "sin días"
+            lines.append(f"Rutina: {r.name} ({days})")
     else:
-        lines.append("Sin rutinas activas.")
+        lines.append("Sin rutina activa")
 
     if recent_sessions:
-        lines.append("Sesiones recientes:")
-        for s in recent_sessions[:5]:
-            completed = sum(1 for sl in s.set_logs if sl.completed)
-            total = len(s.set_logs)
-            lines.append(
-                f"  - {s.date} {s.status} ({completed}/{total} series registradas)"
-            )
+        done = sum(1 for s in recent_sessions if s.status == "completed")
+        lines.append(f"Sesiones último mes: {done}/{len(recent_sessions)}")
 
     if measurements:
-        lines.append("Medidas corporales (cm, deltas vs registro anterior):")
-        for m in measurements[:4]:
-            parts = [f"  - {m.date}:"]
-            for label, field in (
-                ("peso(kg)", "weight_kg"),
-                ("cintura", "waist_cm"),
-                ("abdomen bajo", "abdomen_low_cm"),
-                ("pierna", "thigh_cm"),
-                ("brazo relajado", "arm_relaxed_cm"),
-                ("brazo flexionado", "arm_flexed_cm"),
-            ):
-                value = getattr(m, field, None)
-                delta = getattr(m, f"delta_{field}", None)
-                if value is not None:
-                    if delta is not None:
-                        parts.append(f"{label} {value} ({delta:+})")
-                    else:
-                        parts.append(f"{label} {value}")
-            lines.append(", ".join(parts))
+        last = measurements[0]
+        parts = []
+        for label, field in (
+            ("peso", "weight_kg"),
+            ("cintura", "waist_cm"),
+            ("abdomen", "abdomen_low_cm"),
+            ("pierna", "thigh_cm"),
+            ("brazo", "arm_relaxed_cm"),
+        ):
+            v = getattr(last, field, None)
+            d = getattr(last, f"delta_{field}", None)
+            if v is not None:
+                parts.append(f"{label}:{v}{f'({d:+})' if d else ''}")
+        if parts:
+            lines.append(f"Medidas {last.date}: {', '.join(parts)}")
+        if len(measurements) > 1:
+            prev = measurements[1]
+            pw = getattr(prev, "weight_kg", None)
+            if pw and last.weight_kg:
+                diff = float(last.weight_kg) - float(pw)
+                lines.append(f"Peso vs semana ant: {diff:+.1f}kg")
 
-    return "\n".join(lines)
+    return "; ".join(lines)
