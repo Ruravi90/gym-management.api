@@ -1,3 +1,4 @@
+import math
 import logging
 from datetime import datetime, timedelta
 
@@ -104,6 +105,34 @@ async def weekly_checkin(
                     provider=None,
                 )
 
+        # Validar que tenga rutina activa y suficientes sesiones
+        active_routines = await crud.routine.get_client_routines(client_id=client.id, active_only=True)
+        if not active_routines:
+            return schemas.routine.MentorResponse(
+                reply=(
+                    "📋 No tenés una rutina activa aún. "
+                    "Generá tu rutina con IA primero para poder hacer un reporte de progreso. 💪"
+                ),
+                provider=None,
+            )
+
+        planned_days = len(active_routines[0].days) if active_routines[0].days else 3
+        min_sessions = math.ceil(planned_days * 0.5)
+
+        week_sessions = await crud.routine.get_client_sessions(client_id=client.id, limit=30)
+        week_start = now - timedelta(days=7)
+        week_sessions = [s for s in week_sessions if s.date >= week_start.date()]
+
+        if len(week_sessions) < min_sessions:
+            return schemas.routine.MentorResponse(
+                reply=(
+                    f"📋 Esta semana registraste {len(week_sessions)} de {min_sessions} sesiones "
+                    f"mínimas para un reporte ({planned_days} días planificados / 2 = {min_sessions}). "
+                    f"¡Seguí entrenando y volvé cuando completes las sesiones! 💪"
+                ),
+                provider=None,
+            )
+
         context = await _build_context(client, current_user)
         result = await mentor_service.weekly_checkin(context)
 
@@ -143,6 +172,34 @@ async def monthly_report(
                     ),
                     provider=None,
                 )
+
+        # Validar que tenga rutina activa y suficientes sesiones
+        active_routines = await crud.routine.get_client_routines(client_id=client.id, active_only=True)
+        if not active_routines:
+            return schemas.routine.MentorResponse(
+                reply=(
+                    "📊 No tenés una rutina activa aún. "
+                    "Generá tu rutina con IA primero para poder hacer un reporte mensual. 💪"
+                ),
+                provider=None,
+            )
+
+        planned_days = len(active_routines[0].days) if active_routines[0].days else 3
+        min_sessions = math.ceil(planned_days * 4 * 0.5)
+
+        month_sessions = await crud.routine.get_client_sessions(client_id=client.id, limit=60)
+        month_start = now - timedelta(days=28)
+        month_sessions = [s for s in month_sessions if s.date >= month_start.date()]
+
+        if len(month_sessions) < min_sessions:
+            return schemas.routine.MentorResponse(
+                reply=(
+                    f"📊 Este mes registraste {len(month_sessions)} de {min_sessions} sesiones "
+                    f"mínimas para un reporte mensual ({planned_days} días/semana × 4 semanas × 50%). "
+                    f"¡Seguí entrenando y volvé cuando completes las sesiones! 💪"
+                ),
+                provider=None,
+            )
 
         # Contexto ampliado: 4 semanas de medidas
         measurements = await crud.measurement.list_measurements(client_id=client.id, limit=8)
