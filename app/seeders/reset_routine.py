@@ -81,9 +81,10 @@ async def reset_routine():
     for exercise in await Exercise.all():
         name_lower = exercise.name.lower().strip()
         if name_lower in GIF_CATALOG:
-            urls = GIF_CATALOG[name_lower]
-            exercise.gif_urls = urls
-            await exercise.save(update_fields=["gif_urls"])
+            url = GIF_CATALOG[name_lower]
+            exercise.gif_url = url
+            exercise.gif_urls = [url]
+            await exercise.save(update_fields=["gif_url", "gif_urls"])
             updated += 1
 
     total = await Exercise.all().count()

@@ -13,18 +13,19 @@ logger = logging.getLogger("gymcontrol.seeders")
 
 
 async def update_gifs() -> int:
-    """Actualiza gif_urls de todos los ejercicios desde GIF_CATALOG.
+    """Actualiza gif_url (único) y gif_urls de todos los ejercicios desde GIF_CATALOG.
 
     Retorna el número de ejercicios actualizados.
     """
     updated = 0
-    exercises = await Exercise.all().only("id", "name", "gif_urls")
+    exercises = await Exercise.all().only("id", "name", "gif_url", "gif_urls")
     for exercise in exercises:
         name_lower = exercise.name.lower().strip()
         if name_lower in GIF_CATALOG:
-            urls = GIF_CATALOG[name_lower]
-            exercise.gif_urls = urls
-            await exercise.save(update_fields=["gif_urls"])
+            url = GIF_CATALOG[name_lower]
+            exercise.gif_url = url
+            exercise.gif_urls = [url]
+            await exercise.save(update_fields=["gif_url", "gif_urls"])
             updated += 1
 
     logger.info(f"🎬 GIFs actualizados: {updated}/{len(exercises)} ejercicios")
@@ -47,7 +48,15 @@ if __name__ == "__main__":
     async def _main():
         await Tortoise.init(
             db_url=settings.DATABASE_URL,
-            modules={"models": ["app.models.routine"]},
+            modules={
+                "models": [
+                    "app.models.user",
+                    "app.models.client",
+                    "app.models.routine",
+                    "app.models.measurement",
+                    "app.models.mentor_message",
+                ]
+            },
         )
         await update_gifs()
         await Tortoise.close_connections()
