@@ -117,8 +117,8 @@ async def _call_llm(system_prompt: str, context: str, user_message: str, max_tok
     except Exception as e:  # noqa: BLE001 - respuesta amigable ante cualquier fallo
         return {
             "reply": (
-                "Lo siento, tu mentor IA no pudo conectarse en este momento "
-                f"(error: {type(e).__name__}). Inténtalo de nuevo en unos segundos."
+                "No pude conectarme con la IA en este momento. "
+                "Inténtalo de nuevo en unos segundos. 💪"
             ),
             "provider": None,
         }

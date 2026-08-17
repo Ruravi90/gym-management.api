@@ -72,10 +72,16 @@ async def mentor_chat(
     current_user: User = Depends(get_current_user),
 ):
     """Chatea con el mentor IA. Usa la rutina, el progreso y las medidas del cliente como contexto."""
-    client = await get_current_client(current_user)
-    context = await _build_context(client, current_user)
-    result = await mentor_service.mentor_chat(request.message, context)
-    return schemas.routine.MentorResponse(**result)
+    try:
+        client = await get_current_client(current_user)
+        context = await _build_context(client, current_user)
+        result = await mentor_service.mentor_chat(request.message, context)
+        return schemas.routine.MentorResponse(**result)
+    except Exception as e:
+        return schemas.routine.MentorResponse(
+            reply="No pude procesar tu mensaje en este momento. Inténtalo de nuevo en unos segundos. 💪",
+            provider=None,
+        )
 
 
 @router.post("/weekly-checkin", response_model=schemas.routine.MentorResponse)
@@ -83,10 +89,16 @@ async def weekly_checkin(
     current_user: User = Depends(get_current_user),
 ):
     """Genera el reporte semanal: medidas vs semana anterior + adherencia a la rutina + recomendaciones."""
-    client = await get_current_client(current_user)
-    context = await _build_context(client, current_user)
-    result = await mentor_service.weekly_checkin(context)
-    return schemas.routine.MentorResponse(**result)
+    try:
+        client = await get_current_client(current_user)
+        context = await _build_context(client, current_user)
+        result = await mentor_service.weekly_checkin(context)
+        return schemas.routine.MentorResponse(**result)
+    except Exception as e:
+        return schemas.routine.MentorResponse(
+            reply="No pude generar tu reporte semanal en este momento. Inténtalo de nuevo en unos segundos. 💪",
+            provider=None,
+        )
 
 
 @router.get("/body-type", response_model=schemas.routine.BodyTypeResponse)
