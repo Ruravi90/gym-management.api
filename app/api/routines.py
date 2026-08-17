@@ -81,7 +81,7 @@ async def get_active_session(
     day_id: int = Query(...),
     current_user: User = Depends(get_current_user),
 ):
-    """Busca una sesión activa (status='pending') para reanudar. Retorna null si no existe."""
+    """Busca una sesión activa para reanudar. Retorna null si no existe."""
     client = await get_current_client(current_user)
     session = await crud.routine.get_active_session(client.id, routine_id, day_id)
     if not session:

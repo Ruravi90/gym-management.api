@@ -185,7 +185,10 @@ async def get_active_session(client_id: int, routine_id: int, day_id: int) -> Op
         client_id=client_id,
         routine_id=routine_id,
         day_id=day_id,
-        status="pending",
+        # WorkoutSession uses ``in_progress`` for an open session. Keep
+        # accepting the old value so sessions created by older deployments
+        # can still be resumed instead of duplicated.
+        status__in=["in_progress", "pending"],
     ).order_by("-id").first()
     if session:
         return await _load_session(session.id)
@@ -193,12 +196,12 @@ async def get_active_session(client_id: int, routine_id: int, day_id: int) -> Op
 
 
 async def create_session(client_id: int, data: WorkoutSessionCreate) -> WorkoutSession:
-    # Evitar duplicados: si ya hay una sesión pending para ese día, reusarla
+    # Evitar duplicados: si ya hay una sesión abierta para ese día, reusarla.
     existing = await WorkoutSession.filter(
         client_id=client_id,
         routine_id=data.routine_id,
         day_id=data.day_id,
-        status="pending",
+        status__in=["in_progress", "pending"],
     ).order_by("-id").first()
     if existing:
         return await _load_session(existing.id)
