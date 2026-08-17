@@ -158,16 +158,30 @@ async def startup_event():
         except: pass
 
         command = Command(tortoise_config=TORTOISE_CONFIG, app="models")
-        await command.init()
-        # Fix migrations format before upgrading
+
+        # 1) Fix old-format migrations FIRST (aerich 0.9.2 requires MODELS_STATE
+        #    on the last migration file, otherwise init() raises).
         try:
             await command.fix_migrations()
-        except: pass
-            
-        await command.upgrade(run_in_transaction=True)
-        logger.info("✅ Migrations applied successfully")
+        except Exception as e:
+            logger.warning(f"⚠️  fix_migrations skipped: {e}")
+
+        # 2) Initialize aerich (validates migration files format)
+        try:
+            await command.init()
+        except Exception as e:
+            logger.warning(f"⚠️  aerich init skipped: {e}")
+
+        # 3) Apply pending migrations. If the schema already exists (created by
+        #    Tortoise generate_schemas or manual ALTERs), this fails gracefully
+        #    without blocking startup.
+        try:
+            await command.upgrade(run_in_transaction=True)
+            logger.info("✅ Migrations applied successfully")
+        except Exception as e:
+            logger.warning(f"⚠️  Migrations not applied (schema may already be up to date): {e}")
     except Exception as e:
-        logger.error(f"❌ Error applying migrations: {str(e)}")
+        logger.error(f"❌ Error during migration setup: {str(e)}")
 
     # Import and run seeders after database initialization
     try:
