@@ -1,30 +1,35 @@
 # -*- coding: utf-8 -*-
 """Script para eliminar la rutina de un usuario y actualizar GIFs.
 
-Uso: python -m app.seeders.reset_routine
+Uso: venv/bin/python -m app.seeders.reset_routine
 """
 import asyncio
 import sys
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from tortoise import Tortoise
-from app.models.user import User
-from app.models.client import Client
-from app.models.routine import Routine, RoutineDay, RoutineExercise, WorkoutSession, SetLog
-from app.models.mentor_message import MentorMessage
-from app.seeders.gif_catalog import GIF_CATALOG
+from app.config import settings
 
 
 async def reset_routine():
     await Tortoise.init(
-        db_url="sqlite:///db.sqlite3",
+        db_url=settings.DATABASE_URL,
         modules={"models": [
             "app.models.user", "app.models.client", "app.models.routine",
             "app.models.measurement", "app.models.mentor_message",
         ]},
     )
+
+    from app.models.user import User
+    from app.models.client import Client
+    from app.models.routine import Routine, RoutineDay, RoutineExercise, WorkoutSession, SetLog
+    from app.models.mentor_message import MentorMessage
+    from app.seeders.gif_catalog import GIF_CATALOG
 
     email = "ruravi@icloud.com"
     user = await User.get_or_none(email=email)

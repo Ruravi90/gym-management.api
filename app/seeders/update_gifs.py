@@ -1,22 +1,26 @@
 # -*- coding: utf-8 -*-
 """Script para actualizar gif_urls de los ejercicios existentes.
 
-Uso: python -m app.seeders.update_gifs
+Uso: venv/bin/python -m app.seeders.update_gifs
 """
 import asyncio
 import sys
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from tortoise import Tortoise
 from app.models.routine import Exercise
 from app.seeders.gif_catalog import GIF_CATALOG
+from app.config import settings
 
 
 async def update_gifs():
     await Tortoise.init(
-        db_url="sqlite:///db.sqlite3",
+        db_url=settings.DATABASE_URL,
         modules={"models": ["app.models.routine"]},
     )
 
