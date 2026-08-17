@@ -261,6 +261,11 @@ async def generate_routine_plan(
     if injuries:
         profile_parts.append(f"LESIONES:{injuries}")
 
+    catalog_lines = "\n".join(
+        f"- {ex.name} ({ex.muscle_group or 'general'}, {ex.equipment or 'sin equipo'})"
+        for ex in catalog
+    )
+
     user_message = (
         f"Perfil: {', '.join(profile_parts)}. "
         f"Objetivo:{goal or 'general'}. Días:{days_per_week}. "
