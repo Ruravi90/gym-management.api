@@ -47,8 +47,8 @@ async def seed_super_admin():
     super_admin_phone = os.environ.get("SEED_SUPER_ADMIN_PHONE", "3317242995")
     super_admin_pass = os.environ.get("SEED_SUPER_ADMIN_PASSWORD", "SecurePass123")
 
-    admin_email = os.environ.get("SEED_ADMIN_EMAIL", "oscar@pantherwarriors.com")
-    admin_name = os.environ.get("SEED_ADMIN_NAME", "Oscar Panther")
+    admin_email = os.environ.get("SEED_ADMIN_EMAIL", "oscar@pulse.com")
+    admin_name = os.environ.get("SEED_ADMIN_NAME", "Oscar Pulse")
     admin_phone = os.environ.get("SEED_ADMIN_PHONE", "3317242995")
     admin_pass = os.environ.get("SEED_ADMIN_PASSWORD", "Oscar2025")
 
