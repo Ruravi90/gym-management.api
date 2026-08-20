@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     # Token expiration (in minutes) - 24 hours = 1440 minutes
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
 
+    # Refresh token expiration (in days) - 30 days
+    REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "30"))
+
     # Port for the application (Railway sets PORT environment variable)
     PORT: int = int(os.getenv("PORT", "8000"))
 

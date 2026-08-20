@@ -40,7 +40,10 @@ add_security_middleware(app)
 from fastapi.middleware.cors import CORSMiddleware
 
 # Configure CORS based on environment
+# NOTE: allow_credentials=True requires explicit origins (not "*")
 if settings.FRONTEND_URL == "*":
+    # In dev, reflect the Origin header. FastAPI's CORSMiddleware
+    # handles this when allow_origins contains the actual requesting origin.
     allow_origins = ["*"]
 else:
     allow_origins = [origin.strip() for origin in settings.FRONTEND_URL.split(",")]
@@ -51,7 +54,6 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    # Allow credentials to be sent with cross-origin requests
 )
 
 # Apply rate limiting to specific routes
