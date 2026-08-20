@@ -2,15 +2,19 @@ from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from typing import List
 from datetime import datetime, timezone
 from pydantic import BaseModel
+import logging
 from app import crud, schemas, models
 from app.middleware.security import limiter, file_upload_limits
 from app.services.facial_recognition import FacialRecognitionService
 from app.services.qr_service import validate_qr_token, get_qr_nonce
+from app.services.pin_service import validate_pin
+from app.services.checkin_notifier import notify_checkin
 from app.utils.auth import get_current_user
 from app.models.user import User as UserModel
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 _face_service = None
 
@@ -122,6 +126,7 @@ async def qr_check_in(request: Request, body: QRCheckInRequest):
 
     if last_attendance and last_attendance.check_out_time is None:
         attendance = await crud.attendance.update_attendance_checkout(last_attendance.id, datetime.now(timezone.utc))
+        action = "check_out"
     else:
         attendance_data = {"client_id": client_id, "device_id": "qr"}
         attendance = await crud.attendance.create_attendance(
@@ -130,5 +135,55 @@ async def qr_check_in(request: Request, body: QRCheckInRequest):
             ip_address=request.client.host if request.client else None,
             user_agent=request.headers.get("user-agent")
         )
+        action = "check_in"
+
+    msg = "Salida registrada" if action == "check_out" else "¡Acceso Concedido!"
+    user = await crud.user.get_user_by_client_id(client_id=client_id)
+    if user:
+        logger.info(f"[ATT] Notifying user_id={user.id} for client_id={client_id}: {msg}")
+        await notify_checkin(user.id, "success", msg)
+    else:
+        logger.warning(f"[ATT] No user found for client_id={client_id}")
+
+    return attendance
+
+
+class PinCheckInRequest(BaseModel):
+    pin: str
+
+@router.post("/pin-check-in", response_model=schemas.Attendance)
+@limiter.limit("30 per minute")
+async def pin_check_in(request: Request, body: PinCheckInRequest):
+    payload = validate_pin(body.pin)
+    if not payload:
+        raise HTTPException(status_code=400, detail="PIN inválido o expirado")
+
+    client_id = payload["cid"]
+    client = await crud.client.get_client(client_id=client_id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+
+    last_attendance = await models.Attendance.filter(client_id=client_id).order_by("-check_in_time").first()
+
+    if last_attendance and last_attendance.check_out_time is None:
+        attendance = await crud.attendance.update_attendance_checkout(last_attendance.id, datetime.now(timezone.utc))
+        action = "check_out"
+    else:
+        attendance_data = {"client_id": client_id, "device_id": "pin"}
+        attendance = await crud.attendance.create_attendance(
+            attendance_data,
+            user_id=None,
+            ip_address=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent")
+        )
+        action = "check_in"
+
+    msg = "Salida registrada" if action == "check_out" else "¡Acceso Concedido!"
+    user = await crud.user.get_user_by_client_id(client_id=client_id)
+    if user:
+        logger.info(f"[ATT] Notifying user_id={user.id} for client_id={client_id}: {msg}")
+        await notify_checkin(user.id, "success", msg)
+    else:
+        logger.warning(f"[ATT] No user found for client_id={client_id}")
 
     return attendance

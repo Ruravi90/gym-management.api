@@ -32,3 +32,4 @@ def add_security_middleware(app: FastAPI):
 common_limits = "200 per hour"
 auth_limits = "10 per minute"
 file_upload_limits = "5 per minute"
+pin_check_in_limits = "30 per minute"

@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
     OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gemini-3.5-flash")
 
+    # Redis for real-time check-in notifications
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")
+
 settings = Settings()
 
 # Fail-safe: en producción la SECRET_KEY debe ser un valor real (no el placeholder ni vacía),

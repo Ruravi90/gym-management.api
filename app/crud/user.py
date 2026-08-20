@@ -73,3 +73,15 @@ async def get_users_by_role(role: UserRoleEnum) -> List[User]:
 async def get_active_users() -> List[User]:
     """Get all active users"""
     return await User.filter(status=True)
+
+
+async def get_user_by_client_id(client_id: int) -> Optional[User]:
+    """Get a user by client_id (looks up the client's user_id)"""
+    from app.models.client import Client
+    try:
+        client = await Client.get(id=client_id)
+        if client and client.user_id:
+            return await User.get(id=client.user_id)
+    except DoesNotExist:
+        pass
+    return None

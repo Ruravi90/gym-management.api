@@ -1,11 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, WebSocket, WebSocketDisconnect
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta, datetime, timezone
+import logging
 from app import crud, schemas
 from app.utils.auth import authenticate_user, create_access_token, get_current_user
 from app.config import settings
 from app.middleware.security import limiter, auth_limits
 from app.services.qr_service import generate_qr_token
+from app.services.pin_service import generate_pin
+from app.services.checkin_notifier import subscribe_checkin, notify_checkin
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter()
@@ -95,3 +100,33 @@ async def get_my_qr_token(request: Request, current_user = Depends(get_current_u
         raise HTTPException(status_code=404, detail="No se encontró perfil de cliente asociado a tu cuenta")
     token = generate_qr_token(client.id)
     return {"token": token, "expires_in": 30}
+
+
+@router.get("/my-pin")
+@limiter.limit("30 per minute")
+async def get_my_pin(request: Request, current_user = Depends(get_current_user)):
+    client = await crud.client.get_client_by_user_id(user_id=current_user.id)
+    if not client:
+        raise HTTPException(status_code=404, detail="No se encontró perfil de cliente asociado a tu cuenta")
+    pin = generate_pin(client.id)
+    return {"pin": pin, "expires_in": 60}
+
+
+@router.websocket("/ws/checkin/{user_id}")
+async def ws_checkin(websocket: WebSocket, user_id: int):
+    logger.info(f"[WS] Client connected for user_id={user_id}")
+    await websocket.accept()
+    try:
+        async for event in subscribe_checkin(user_id):
+            logger.info(f"[WS] Sending to user_id={user_id}: {event}")
+            await websocket.send_json(event)
+            break
+    except WebSocketDisconnect:
+        logger.info(f"[WS] Client disconnected for user_id={user_id}")
+    except Exception as e:
+        logger.error(f"[WS] Error for user_id={user_id}: {e}")
+    finally:
+        try:
+            await websocket.close()
+        except Exception:
+            pass

@@ -23,6 +23,7 @@ from app.api.routines import router as routines_router
 from app.api.mentor import router as mentor_router
 from app.api.measurements import router as measurements_router
 from app.middleware.security import add_security_middleware, limiter, common_limits, auth_limits, file_upload_limits
+from app.services.checkin_notifier import init_redis, close_redis
 
 # Configure FastAPI app with metadata
 app = FastAPI(
@@ -108,6 +109,9 @@ seeders_executed = False
 @app.on_event("startup")
 async def startup_event():
     global seeders_executed
+
+    await init_redis()
+
     with seeder_lock:
         if seeders_executed:
             return
@@ -267,3 +271,8 @@ def read_root(request: Request):
 @limiter.limit(common_limits)
 def health_check(request: Request):
     return {"status": "ok", "environment": settings.ENVIRONMENT}
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    await close_redis()
