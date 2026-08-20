@@ -10,7 +10,7 @@ print("Loading audit_logs API module...")
 
 router = APIRouter()
 
-@router.get("/", response_model=List[schemas.AuditLog])
+@router.get("", response_model=List[schemas.AuditLog])
 async def get_audit_logs(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, le=1000),

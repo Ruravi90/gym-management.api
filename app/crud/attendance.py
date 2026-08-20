@@ -1,5 +1,5 @@
 from typing import List, Optional
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from app.models.attendance import Attendance
 from app.models.client import Client
 from tortoise.exceptions import DoesNotExist
@@ -27,9 +27,12 @@ async def get_attendance_by_client(client_id: int) -> List[Attendance]:
 
 async def get_attendance_today() -> List[Attendance]:
     """Get all attendance records for today"""
-    today = datetime.now().date()
+    today = datetime.now(timezone.utc).date()
+    start_of_today = datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc)
+    start_of_tomorrow = start_of_today + timedelta(days=1)
     return await Attendance.filter(
-        check_in_time__date=today
+        check_in_time__gte=start_of_today,
+        check_in_time__lt=start_of_tomorrow
     )
 
 

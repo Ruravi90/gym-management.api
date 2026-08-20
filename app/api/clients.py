@@ -18,7 +18,7 @@ def get_face_service() -> FacialRecognitionService:
         _face_service = FacialRecognitionService()
     return _face_service
 
-@router.post("/", response_model=schemas.Client)
+@router.post("", response_model=schemas.Client)
 async def create_client(client: schemas.ClientCreate, current_user: UserModel = Depends(get_current_user)):
     if client.email:
         db_client = await crud.client.get_client_by_email(email=client.email)
@@ -37,7 +37,7 @@ async def create_client(client: schemas.ClientCreate, current_user: UserModel = 
         user_agent=None   # Will be populated later with request info
     )
 
-@router.get("/", response_model=List[schemas.Client])
+@router.get("", response_model=List[schemas.Client])
 async def read_clients(skip: int = 0, limit: int = 100, current_user: UserModel = Depends(get_current_user)):
     try:
         logger.debug(f"accessing read_clients. User: {current_user.email}, Skip: {skip}, Limit: {limit}")

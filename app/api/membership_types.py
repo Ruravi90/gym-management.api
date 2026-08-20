@@ -7,7 +7,7 @@ from app.models.user import User
 router = APIRouter()
 
 # Endpoints específicos para tipos de membresía
-@router.get("/", response_model=List[schemas.MembershipType])
+@router.get("", response_model=List[schemas.MembershipType])
 async def read_membership_types(
     skip: int = 0,
     limit: int = 100,
@@ -27,7 +27,7 @@ async def read_membership_types(
     return await crud.membership.get_membership_types(skip=skip, limit=limit, active_only=active_only)
 
 
-@router.post("/", response_model=schemas.MembershipType)
+@router.post("", response_model=schemas.MembershipType)
 async def create_membership_type(
     membership_type: schemas.MembershipTypeCreate,
     current_user: User = Depends(get_current_user)

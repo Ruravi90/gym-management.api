@@ -12,7 +12,8 @@ logger = setup_logging()
 
 from app.api import users, memberships, attendance, membership_types, gym_class
 from app.api.clients import router as clients_router
-from app.api.facial_recognition import router as facial_recognition_router
+# Facial recognition disabled — replaced by QR-based check-in
+# from app.api.facial_recognition import router as facial_recognition_router
 from app.api.auth import router as auth_router
 from app.api.audit_logs import router as audit_logs_router
 from app.api.analytics import router as analytics_router
@@ -67,8 +68,8 @@ logger.info("Including attendance router...")
 app.include_router(attendance.router, prefix="/attendance", tags=["attendance"])
 logger.info("Including classes router...")
 app.include_router(gym_class.router, prefix="/classes", tags=["classes"])
-logger.info("Including facial-recognition router...")
-app.include_router(facial_recognition_router, prefix="/facial-recognition", tags=["facial-recognition"])
+# logger.info("Including facial-recognition router...")
+# app.include_router(facial_recognition_router, prefix="/facial-recognition", tags=["facial-recognition"])
 logger.info("Including audit-logs router...")
 app.include_router(audit_logs_router, prefix="/audit-logs", tags=["audit-logs"])
 app.include_router(payments_router, prefix="/payments", tags=["payments"])

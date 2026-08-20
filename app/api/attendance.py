@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from typing import List
 from datetime import datetime, timezone
+from pydantic import BaseModel
 from app import crud, schemas, models
 from app.middleware.security import limiter, file_upload_limits
 from app.services.facial_recognition import FacialRecognitionService
+from app.services.qr_service import validate_qr_token, get_qr_nonce
 from app.utils.auth import get_current_user
 from app.models.user import User as UserModel
 
@@ -18,7 +20,7 @@ def get_face_service() -> FacialRecognitionService:
         _face_service = FacialRecognitionService()
     return _face_service
 
-@router.post("/", response_model=schemas.Attendance)
+@router.post("", response_model=schemas.Attendance)
 async def create_attendance(attendance: schemas.AttendanceCreate, current_user: UserModel = Depends(get_current_user)):
     # Verify client exists
     client = await crud.client.get_client(client_id=attendance.client_id)
@@ -89,6 +91,44 @@ async def check_in_manual(client_id: int, current_user: UserModel = Depends(get_
             user_id=current_user.id,
             ip_address=None,  # Will be populated later with request info
             user_agent=None   # Will be populated later with request info
+        )
+
+    return attendance
+
+
+_used_nonces = set()
+
+class QRCheckInRequest(BaseModel):
+    token: str
+
+@router.post("/qr-check-in", response_model=schemas.Attendance)
+@limiter.limit("30 per minute")
+async def qr_check_in(request: Request, body: QRCheckInRequest):
+    payload = validate_qr_token(body.token)
+    if not payload:
+        raise HTTPException(status_code=400, detail="Token QR inválido o expirado")
+
+    nonce = get_qr_nonce(body.token)
+    if nonce in _used_nonces:
+        raise HTTPException(status_code=400, detail="Token QR ya fue utilizado")
+    _used_nonces.add(nonce)
+
+    client_id = payload["cid"]
+    client = await crud.client.get_client(client_id=client_id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+
+    last_attendance = await models.Attendance.filter(client_id=client_id).order_by("-check_in_time").first()
+
+    if last_attendance and last_attendance.check_out_time is None:
+        attendance = await crud.attendance.update_attendance_checkout(last_attendance.id, datetime.now(timezone.utc))
+    else:
+        attendance_data = {"client_id": client_id, "device_id": "qr"}
+        attendance = await crud.attendance.create_attendance(
+            attendance_data,
+            user_id=None,
+            ip_address=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent")
         )
 
     return attendance

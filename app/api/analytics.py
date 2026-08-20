@@ -21,10 +21,12 @@ async def get_dashboard_analytics(current_user: User = Depends(get_current_user)
 
     today = datetime.now(timezone.utc).date()
     thirty_days_ago = today - timedelta(days=30)
+    start_of_today = datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc)
+    start_of_thirty_days_ago = datetime.combine(thirty_days_ago, datetime.min.time(), tzinfo=timezone.utc)
     
     # 1. Attendance History (Last 30 days)
     attendances = await Attendance.filter(
-        check_in_time__date__gte=thirty_days_ago
+        check_in_time__gte=start_of_thirty_days_ago
     ).values("check_in_time")
     
     attendance_counts = Counter()
@@ -39,7 +41,7 @@ async def get_dashboard_analytics(current_user: User = Depends(get_current_user)
 
     # 2. Revenue History (Last 30 days)
     memberships = await Membership.filter(
-        start_date__date__gte=thirty_days_ago
+        start_date__gte=start_of_thirty_days_ago
     ).values("start_date", "price_paid")
     
     revenue_sums = Counter()
@@ -62,13 +64,18 @@ async def get_dashboard_analytics(current_user: User = Depends(get_current_user)
     
     # Revenue this month
     first_of_month = today.replace(day=1)
+    start_of_month = datetime.combine(first_of_month, datetime.min.time(), tzinfo=timezone.utc)
     month_revenue_data = await Membership.filter(
-        start_date__date__gte=first_of_month
+        start_date__gte=start_of_month
     ).annotate(total=Sum("price_paid")).values("total")
     total_revenue_month = month_revenue_data[0]["total"] if month_revenue_data and month_revenue_data[0]["total"] else 0
 
     # Check-ins today
-    check_ins_today = await Attendance.filter(check_in_time__date=today).count()
+    start_of_tomorrow = start_of_today + timedelta(days=1)
+    check_ins_today = await Attendance.filter(
+        check_in_time__gte=start_of_today,
+        check_in_time__lt=start_of_tomorrow
+    ).count()
 
     return {
         "attendance_history": attendance_history,
@@ -86,6 +93,9 @@ async def get_analytics_summary(current_user: User = Depends(get_current_user)):
 
     today = datetime.now(timezone.utc).date()
     first_of_month = today.replace(day=1)
+    start_of_today = datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc)
+    start_of_month = datetime.combine(first_of_month, datetime.min.time(), tzinfo=timezone.utc)
+    start_of_tomorrow = start_of_today + timedelta(days=1)
     
     total_clients = await models.Client.all().count()
     active_memberships = await Membership.filter(
@@ -104,11 +114,14 @@ async def get_analytics_summary(current_user: User = Depends(get_current_user)):
     ).count()
 
     revenue_data = await Membership.filter(
-        start_date__date__gte=first_of_month
+        start_date__gte=start_of_month
     ).annotate(total=Sum("price_paid")).values("total")
     revenue_month = revenue_data[0]["total"] if revenue_data and revenue_data[0]["total"] else 0
     
-    check_ins_today = await Attendance.filter(check_in_time__date=today).count()
+    check_ins_today = await Attendance.filter(
+        check_in_time__gte=start_of_today,
+        check_in_time__lt=start_of_tomorrow
+    ).count()
 
     return {
         "total_clients": total_clients,

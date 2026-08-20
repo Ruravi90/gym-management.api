@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta, datetime, timezone
 from app import crud, schemas
-from app.utils.auth import authenticate_user, create_access_token
+from app.utils.auth import authenticate_user, create_access_token, get_current_user
 from app.config import settings
 from app.middleware.security import limiter, auth_limits
+from app.services.qr_service import generate_qr_token
 
 
 router = APIRouter()
@@ -84,3 +85,13 @@ async def register(request: Request, user_data: schemas.UserRegister):
         })
         
     return user
+
+
+@router.get("/my-qr-token")
+@limiter.limit("30 per minute")
+async def get_my_qr_token(request: Request, current_user = Depends(get_current_user)):
+    client = await crud.client.get_client_by_user_id(user_id=current_user.id)
+    if not client:
+        raise HTTPException(status_code=404, detail="No se encontró perfil de cliente asociado a tu cuenta")
+    token = generate_qr_token(client.id)
+    return {"token": token, "expires_in": 30}

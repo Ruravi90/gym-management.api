@@ -12,7 +12,7 @@ router = APIRouter()
 ADMIN_ROLES = ("super_admin", "admin")
 
 
-@router.post("/", response_model=schemas.User)
+@router.post("", response_model=schemas.User)
 async def create_user(user: schemas.UserCreate, current_user: UserModel = Depends(get_current_user)):
     # Only administrative roles can create system users
     if current_user.role not in ADMIN_ROLES:
@@ -28,7 +28,7 @@ async def create_user(user: schemas.UserCreate, current_user: UserModel = Depend
     return await crud.user.create_user(user_data=user.dict())
 
 
-@router.get("/", response_model=List[schemas.User])
+@router.get("", response_model=List[schemas.User])
 async def read_users(skip: int = 0, limit: int = 100, current_user: UserModel = Depends(get_current_user)):
     # Only admins/receptionists can list users
     if current_user.role not in ADMIN_ROLES:

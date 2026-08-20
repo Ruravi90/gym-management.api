@@ -7,7 +7,7 @@ from app.models.user import User as UserModel
 router = APIRouter()
 
 
-@router.post("/", response_model=schemas.GymClass)
+@router.post("", response_model=schemas.GymClass)
 async def create_gym_class(
     gym_class: schemas.GymClassCreate,
     current_user: UserModel = Depends(get_current_user)
@@ -18,7 +18,7 @@ async def create_gym_class(
     return await crud.gym_class.create_gym_class(class_data=gym_class.dict())
 
 
-@router.get("/", response_model=List[schemas.GymClass])
+@router.get("", response_model=List[schemas.GymClass])
 async def read_gym_classes(
     skip: int = 0,
     limit: int = 100,

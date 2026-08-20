@@ -9,7 +9,7 @@ from app.models.membership import Membership, MembershipType
 router = APIRouter()
 
 
-@router.post("/", response_model=schemas.Membership)
+@router.post("", response_model=schemas.Membership)
 async def create_membership(
     membership: schemas.MembershipCreate,
     current_user: User = Depends(get_current_user)
@@ -48,7 +48,7 @@ async def create_membership(
     )
 
 
-@router.get("/", response_model=List[schemas.Membership])
+@router.get("", response_model=List[schemas.Membership])
 async def read_memberships(
     skip: int = 0,
     limit: int = 100,
