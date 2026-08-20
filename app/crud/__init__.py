@@ -10,3 +10,4 @@ from . import kaizen as kaizen
 from . import routine as routine
 from . import measurement as measurement
 from . import mentor as mentor
+from . import gamification as gamification

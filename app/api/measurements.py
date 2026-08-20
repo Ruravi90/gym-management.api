@@ -52,7 +52,17 @@ async def create_measurement(
     else:
         client = await get_current_client(current_user)
         target_client_id = client.id
-    return await crud.measurement.upsert_measurement(client_id=target_client_id, data=measurement)
+    result = await crud.measurement.upsert_measurement(client_id=target_client_id, data=measurement)
+
+    # Gamification: award XP for registering measurements
+    try:
+        from app.services.gamification import GamificationService
+        gamification = GamificationService()
+        await gamification.award_xp(target_client_id, "measurement_logged", 5, "Medidas corporales registradas")
+    except Exception:
+        pass
+
+    return result
 
 
 @router.put("/{measurement_id}", response_model=schemas.measurement.BodyMeasurementResponse)

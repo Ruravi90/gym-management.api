@@ -79,6 +79,8 @@ from app.api.member import router as member_router
 app.include_router(member_router, prefix="/member", tags=["member"])
 from app.api.kaizen import router as kaizen_router
 app.include_router(kaizen_router, prefix="/kaizen", tags=["kaizen"])
+from app.api.gamification import router as gamification_router
+app.include_router(gamification_router, prefix="/gamification", tags=["gamification"])
 logger.info("Including exercises router...")
 app.include_router(exercises_router, prefix="/exercises", tags=["exercises"])
 logger.info("Including routines router...")
@@ -173,6 +175,28 @@ async def startup_event():
             logger.info("✅ Added last_monthly_report_at to clients")
         except: pass
 
+        # Gamification columns
+        try:
+            await conn.execute_query("ALTER TABLE `clients` ADD COLUMN `xp` INT DEFAULT 0")
+            logger.info("✅ Added xp to clients")
+        except: pass
+        try:
+            await conn.execute_query("ALTER TABLE `clients` ADD COLUMN `level` INT DEFAULT 1")
+            logger.info("✅ Added level to clients")
+        except: pass
+        try:
+            await conn.execute_query("ALTER TABLE `clients` ADD COLUMN `current_streak` INT DEFAULT 0")
+            logger.info("✅ Added current_streak to clients")
+        except: pass
+        try:
+            await conn.execute_query("ALTER TABLE `clients` ADD COLUMN `longest_streak` INT DEFAULT 0")
+            logger.info("✅ Added longest_streak to clients")
+        except: pass
+        try:
+            await conn.execute_query("ALTER TABLE `clients` ADD COLUMN `last_activity_date` DATE NULL")
+            logger.info("✅ Added last_activity_date to clients")
+        except: pass
+
         # Exercise GIF + detail columns
         try:
             await conn.execute_query("ALTER TABLE `exercises` ADD COLUMN `gif_urls` JSON NULL")
@@ -254,6 +278,20 @@ async def startup_event():
             await update_gifs()
         except Exception as e:
             logger.warning(f"⚠️  Warning: Could not seed exercise GIFs: {str(e)}")
+
+        # Seed gamification achievements
+        try:
+            from app.seeders.seed_achievements import seed_achievements
+            await seed_achievements()
+        except Exception as e:
+            logger.warning(f"⚠️  Warning: Could not seed achievements: {str(e)}")
+
+        # Seed weekly challenges
+        try:
+            from app.seeders.seed_weekly_challenges import seed_weekly_challenges
+            await seed_weekly_challenges()
+        except Exception as e:
+            logger.warning(f"⚠️  Warning: Could not seed weekly challenges: {str(e)}")
 
         logger.info("✅ Database seeding completed at startup!")
     except Exception as e:

@@ -10,6 +10,7 @@ from .kaizen import KaizenHabit, KaizenLog, KaizenMedal, KaizenLogStatus, MedalT
 from .routine import Exercise, Routine, RoutineDay, RoutineExercise, WorkoutSession, SetLog
 from .measurement import BodyMeasurement
 from .mentor_message import MentorMessage
+from .gamification import XpLog, AchievementDefinition, ClientAchievement, WeeklyChallenge, ClientChallenge, ActionType, CriteriaType
 
 __all__ = [
     "User",
@@ -35,4 +36,11 @@ __all__ = [
     "SetLog",
     "BodyMeasurement",
     "MentorMessage",
+    "XpLog",
+    "AchievementDefinition",
+    "ClientAchievement",
+    "WeeklyChallenge",
+    "ClientChallenge",
+    "ActionType",
+    "CriteriaType",
 ]

@@ -13,6 +13,14 @@ class Client(Model):
     user = fields.ForeignKeyField("models.User", related_name="client_profile", null=True, on_delete=fields.SET_NULL)
     last_weekly_checkin_at = fields.DatetimeField(null=True)
     last_monthly_report_at = fields.DatetimeField(null=True)
+
+    # Gamification fields
+    xp = fields.IntField(default=0)
+    level = fields.IntField(default=1)
+    current_streak = fields.IntField(default=0)
+    longest_streak = fields.IntField(default=0)
+    last_activity_date = fields.DateField(null=True)
+
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
     

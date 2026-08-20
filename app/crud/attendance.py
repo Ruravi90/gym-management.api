@@ -55,6 +55,17 @@ async def create_attendance(
         user_agent=user_agent
     )
 
+    # Gamification: award XP and update streak for check-in
+    try:
+        from app.services.gamification import GamificationService
+        gamification = GamificationService()
+        client_id = attendance_data.get("client_id")
+        if client_id:
+            await gamification.award_xp(client_id, "check_in", 10, "Check-in al gym")
+            await gamification.update_streak(client_id)
+    except Exception:
+        pass  # Don't fail attendance if gamification fails
+
     return attendance
 
 

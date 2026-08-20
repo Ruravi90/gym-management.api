@@ -125,7 +125,22 @@ async def update_session(
     client = await get_current_client(current_user)
     if db_session.client_id != client.id and not is_staff(current_user):
         raise HTTPException(status_code=404, detail="Sesión no encontrada")
-    return await crud.routine.update_session(session_id, session)
+
+    was_completed = db_session.status == "completed"
+    updated = await crud.routine.update_session(session_id, session)
+
+    # Gamification: award XP when session is completed for the first time
+    if not was_completed and updated.status == "completed":
+        try:
+            from app.services.gamification import GamificationService
+            gamification = GamificationService()
+            await gamification.award_xp(
+                client.id, "workout_completed", 20, "Sesión de entrenamiento completada"
+            )
+        except Exception:
+            pass
+
+    return updated
 
 
 @router.delete("/sessions/{session_id}", status_code=204)
@@ -159,7 +174,17 @@ async def add_set_log(
     client = await get_current_client(current_user)
     if db_session.client_id != client.id and not is_staff(current_user):
         raise HTTPException(status_code=404, detail="Sesión no encontrada")
-    return await crud.routine.upsert_set_log(session_id, set_log)
+    result = await crud.routine.upsert_set_log(session_id, set_log)
+
+    # Gamification: small XP for logging a set
+    try:
+        from app.services.gamification import GamificationService
+        gamification = GamificationService()
+        await gamification.award_xp(client.id, "set_logged", 2, "Serie registrada")
+    except Exception:
+        pass
+
+    return result
 
 
 @router.put("/sets/{log_id}", response_model=schemas.routine.SetLogResponse)

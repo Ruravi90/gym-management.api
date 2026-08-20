@@ -69,6 +69,17 @@ async def record_habit_log(habit_id: int, log_data: schemas.kaizen.KaizenLogCrea
     
     log = await crud.kaizen.record_log(habit_id=habit_id, log_data=log_data)
     
+    # Gamification: award XP for kaizen victory
+    if log_data.status == "victory":
+        try:
+            from app.services.gamification import GamificationService
+            gamification = GamificationService()
+            await gamification.award_xp(
+                client.id, "kaizen_victory", 5, f"Victoria: {db_habit.name}"
+            )
+        except Exception:
+            pass  # Don't fail kaizen if gamification fails
+    
     # Evaluate and award medals based on new logs
     await crud.kaizen.check_and_award_medals(client_id=client.id, habit_id=habit_id)
     # Revoke medals if penalizations apply

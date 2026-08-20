@@ -9,6 +9,7 @@ from .audit_log import AuditLog, AuditLogCreate, AuditLogUpdate, ActionTypeEnum
 from . import kaizen as kaizen
 from . import routine as routine
 from . import measurement as measurement
+from . import gamification as gamification
 
 __all__ = [
     "User",
