@@ -312,11 +312,13 @@ async def startup_event():
     # Import and run seeders after database initialization
     try:
         from app.seeders.seed_data import seed_super_admin, seed_membership_types
+        from app.seeders.seed_plans import seed_plans
         logger.info("🌱 Starting database seeding process...")
 
         # Run individual seeders
         await seed_super_admin()
         await seed_membership_types()
+        await seed_plans()
 
         # Seed exercise catalog (routines feature)
         try:
