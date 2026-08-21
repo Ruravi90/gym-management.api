@@ -40,6 +40,20 @@ async def seed_super_admin():
 
     # Import models inside the function to ensure they're available after DB initialization
     from app.models.user import User, UserRoleEnum
+    from app.models.tenant import Tenant
+
+    # Create default tenant
+    default_tenant = await Tenant.filter(slug="default").first()
+    if not default_tenant:
+        default_tenant = await Tenant.create(
+            name="Mi Gimnasio",
+            slug="default",
+            email="admin@migym.com",
+            phone="3317242995",
+            status="active",
+            max_users=50,
+        )
+        logger.info(f"Default tenant created with ID: {default_tenant.id}")
 
     # Read credentials from environment variables
     super_admin_email = os.environ.get("SEED_SUPER_ADMIN_EMAIL", "ruravi@icloud.com")
@@ -61,7 +75,8 @@ async def seed_super_admin():
             phone=super_admin_phone,
             role=UserRoleEnum.SUPER_ADMIN,
             hashed_password=hash_password(super_admin_pass),
-            status=True
+            status=True,
+            tenant=None,  # Super admin no pertenece a ningún tenant
         )
         logger.info(f"Super admin user created with ID: {super_admin.id}")
 
@@ -73,7 +88,8 @@ async def seed_super_admin():
             phone=admin_phone,
             role=UserRoleEnum.ADMIN,
             hashed_password=hash_password(admin_pass),
-            status=True
+            status=True,
+            tenant_id=default_tenant.id,
         )
         logger.info(f"Admin user created with ID: {admin.id}")
 
@@ -83,6 +99,11 @@ async def seed_membership_types():
     logger.info("Seeding membership types...")
 
     from app.models.membership import MembershipType
+    from app.models.tenant import Tenant
+
+    # Get default tenant to assign membership types
+    default_tenant = await Tenant.filter(slug="default").first()
+    tenant_id = default_tenant.id if default_tenant else None
 
     # Define default membership types with their characteristics
     default_memberships = [
@@ -168,6 +189,9 @@ async def seed_membership_types():
             logger.info(f"Membership type '{membership_data['name']}' already exists, skipping.")
             continue
 
+        if tenant_id is not None:
+            membership_data['tenant_id'] = tenant_id
+
         membership_type = await MembershipType.create(**membership_data)
         logger.info(f"Created membership type: {membership_type.name}")
 
@@ -179,6 +203,11 @@ async def seed_sample_clients():
     logger.info("Seeding sample clients...")
     
     from app.models.client import Client
+    from app.models.tenant import Tenant
+
+    # Get default tenant to assign clients
+    default_tenant = await Tenant.filter(slug="default").first()
+    tenant_id = default_tenant.id if default_tenant else None
 
     sample_clients = [
         {
@@ -224,6 +253,9 @@ async def seed_sample_clients():
         if existing_client:
             logger.info(f"Client '{client_data['name']}' already exists, skipping.")
             continue
+
+        if tenant_id is not None:
+            client_data['tenant_id'] = tenant_id
 
         client = await Client.create(**client_data)
         logger.info(f"Created client: {client.name}")

@@ -4,48 +4,46 @@ from app.utils.auth import hash_password
 from tortoise.exceptions import DoesNotExist
 
 
-async def get_user(user_id: int) -> Optional[User]:
-    """Get a specific user by ID"""
+async def get_user(user_id: int, tenant_id: Optional[int] = None) -> Optional[User]:
     try:
-        return await User.get(id=user_id)
+        filters = {"id": user_id}
+        if tenant_id is not None:
+            filters["tenant_id"] = tenant_id
+        return await User.get(**filters)
     except DoesNotExist:
         return None
 
 
 async def get_user_by_email(email: str) -> Optional[User]:
-    """Get a user by email"""
     try:
         return await User.get(email=email)
     except DoesNotExist:
         return None
 
 
-async def get_users(skip: int = 0, limit: int = 100) -> List[User]:
-    """Get all users with pagination"""
-    return await User.all().offset(skip).limit(limit)
+async def get_users(skip: int = 0, limit: int = 100, tenant_id: Optional[int] = None) -> List[User]:
+    query = User.all()
+    if tenant_id is not None:
+        query = query.filter(tenant_id=tenant_id)
+    return await query.offset(skip).limit(limit)
 
 
-async def create_user(user_data: dict) -> User:
-    """Create a new user"""
-    # Hash the password before storing
+async def create_user(user_data: dict, tenant_id: Optional[int] = None) -> User:
     if 'password' in user_data:
         user_data['hashed_password'] = hash_password(user_data.pop('password'))
+    if tenant_id is not None and 'tenant_id' not in user_data:
+        user_data['tenant_id'] = tenant_id
     return await User.create(**user_data)
 
 
-async def update_user(user_id: int, user_update) -> Optional[User]:
-    """Update a user"""
-    user = await get_user(user_id)
+async def update_user(user_id: int, user_update, tenant_id: Optional[int] = None) -> Optional[User]:
+    user = await get_user(user_id, tenant_id=tenant_id)
     if user:
-        # Convert pydantic model to dict if needed
         if hasattr(user_update, 'model_dump'):
-            # Pydantic v2
             update_data = user_update.model_dump(exclude_unset=True)
         elif hasattr(user_update, 'dict'):
-            # Pydantic v1
             update_data = user_update.dict(exclude_unset=True)
         else:
-            # Already a dict
             update_data = user_update
 
         for field, value in update_data.items():
@@ -57,26 +55,28 @@ async def update_user(user_id: int, user_update) -> Optional[User]:
     return user
 
 
-async def delete_user(user_id: int) -> Optional[User]:
-    """Delete a user"""
-    user = await get_user(user_id)
+async def delete_user(user_id: int, tenant_id: Optional[int] = None) -> Optional[User]:
+    user = await get_user(user_id, tenant_id=tenant_id)
     if user:
         await user.delete()
     return user
 
 
-async def get_users_by_role(role: UserRoleEnum) -> List[User]:
-    """Get all users with a specific role"""
-    return await User.filter(role=role)
+async def get_users_by_role(role: UserRoleEnum, tenant_id: Optional[int] = None) -> List[User]:
+    filters = {"role": role}
+    if tenant_id is not None:
+        filters["tenant_id"] = tenant_id
+    return await User.filter(**filters)
 
 
-async def get_active_users() -> List[User]:
-    """Get all active users"""
-    return await User.filter(status=True)
+async def get_active_users(tenant_id: Optional[int] = None) -> List[User]:
+    filters = {"status": True}
+    if tenant_id is not None:
+        filters["tenant_id"] = tenant_id
+    return await User.filter(**filters)
 
 
 async def get_user_by_client_id(client_id: int) -> Optional[User]:
-    """Get a user by client_id (looks up the client's user_id)"""
     from app.models.client import Client
     try:
         client = await Client.get(id=client_id)

@@ -20,6 +20,12 @@ async def get_current_client(current_user: UserModel = Depends(get_current_user)
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Client profile not found for this user"
         )
+    # Tenant isolation: non-super_admin users can only access their own tenant's data
+    if current_user.role != "super_admin" and client.tenant_id != current_user.tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Client profile not found for this user"
+        )
     return client
 
 @router.post("/create-preference", response_model=PreferenceResponse)
@@ -32,22 +38,26 @@ async def create_payment_preference(
     """
     try:
         # 1. Get membership type
-        membership_type = await crud.membership.get_membership_type(preference_data.membership_type_id)
+        tenant_id = getattr(client, 'tenant_id', None)
+        membership_type = await crud.membership.get_membership_type(preference_data.membership_type_id, tenant_id=tenant_id)
         if not membership_type:
             raise HTTPException(status_code=404, detail="Membership type not found")
 
         # 2. Create pending membership record
         # This gives us an ID to use as external_reference in Mercado Pago
-        membership = await crud.membership.create_membership({
-            "client_id": client.id,
-            "membership_type_id": membership_type.id,
-            "price": membership_type.price,
-            "price_paid": 0.0,
-            "status": "pending",
-            "payment_status": "pending",
-            "payment_method": "mercadopago",
-            "type": membership_type.name
-        })
+        membership = await crud.membership.create_membership(
+            {
+                "client_id": client.id,
+                "membership_type_id": membership_type.id,
+                "price": membership_type.price,
+                "price_paid": 0.0,
+                "status": "pending",
+                "payment_status": "pending",
+                "payment_method": "mercadopago",
+                "type": membership_type.name
+            },
+            tenant_id=tenant_id,
+        )
 
         # 3. Create Mercado Pago preference
         preference_body = {

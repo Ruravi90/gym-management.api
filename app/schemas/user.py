@@ -33,6 +33,8 @@ class UserUpdate(BaseModel):
 class User(UserBase):
     id: int
     status: bool = True
+    tenant_id: Optional[int] = None
+    tenant_name: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

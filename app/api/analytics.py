@@ -19,15 +19,18 @@ async def get_dashboard_analytics(current_user: User = Depends(get_current_user)
     if current_user.role not in ["admin", "manager", "super_admin"]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+
     today = datetime.now(timezone.utc).date()
     thirty_days_ago = today - timedelta(days=30)
     start_of_today = datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc)
     start_of_thirty_days_ago = datetime.combine(thirty_days_ago, datetime.min.time(), tzinfo=timezone.utc)
     
     # 1. Attendance History (Last 30 days)
-    attendances = await Attendance.filter(
-        check_in_time__gte=start_of_thirty_days_ago
-    ).values("check_in_time")
+    att_query = Attendance.filter(check_in_time__gte=start_of_thirty_days_ago)
+    if tenant_id is not None:
+        att_query = att_query.filter(tenant_id=tenant_id)
+    attendances = await att_query.values("check_in_time")
     
     attendance_counts = Counter()
     for a in attendances:
@@ -40,9 +43,10 @@ async def get_dashboard_analytics(current_user: User = Depends(get_current_user)
     ]
 
     # 2. Revenue History (Last 30 days)
-    memberships = await Membership.filter(
-        start_date__gte=start_of_thirty_days_ago
-    ).values("start_date", "price_paid")
+    mem_query = Membership.filter(start_date__gte=start_of_thirty_days_ago)
+    if tenant_id is not None:
+        mem_query = mem_query.filter(tenant_id=tenant_id)
+    memberships = await mem_query.values("start_date", "price_paid")
     
     revenue_sums = Counter()
     for m in memberships:
@@ -55,27 +59,37 @@ async def get_dashboard_analytics(current_user: User = Depends(get_current_user)
     ]
 
     # 3. Membership Distribution
-    dist = await Membership.filter(status="active").values("type")
+    dist_query = Membership.filter(status="active")
+    if tenant_id is not None:
+        dist_query = dist_query.filter(tenant_id=tenant_id)
+    dist = await dist_query.values("type")
     type_counts = Counter(d["type"] for d in dist)
     membership_distribution = [{"name": k, "value": v} for k, v in type_counts.items()]
 
     # 4. General Stats
-    active_clients = await models.Client.all().count() # For now total clients as active proxy
+    client_query = models.Client.all()
+    if tenant_id is not None:
+        client_query = client_query.filter(tenant_id=tenant_id)
+    active_clients = await client_query.count()
     
     # Revenue this month
     first_of_month = today.replace(day=1)
     start_of_month = datetime.combine(first_of_month, datetime.min.time(), tzinfo=timezone.utc)
-    month_revenue_data = await Membership.filter(
-        start_date__gte=start_of_month
-    ).annotate(total=Sum("price_paid")).values("total")
+    rev_query = Membership.filter(start_date__gte=start_of_month)
+    if tenant_id is not None:
+        rev_query = rev_query.filter(tenant_id=tenant_id)
+    month_revenue_data = await rev_query.annotate(total=Sum("price_paid")).values("total")
     total_revenue_month = month_revenue_data[0]["total"] if month_revenue_data and month_revenue_data[0]["total"] else 0
 
     # Check-ins today
     start_of_tomorrow = start_of_today + timedelta(days=1)
-    check_ins_today = await Attendance.filter(
+    checkin_query = Attendance.filter(
         check_in_time__gte=start_of_today,
         check_in_time__lt=start_of_tomorrow
-    ).count()
+    )
+    if tenant_id is not None:
+        checkin_query = checkin_query.filter(tenant_id=tenant_id)
+    check_ins_today = await checkin_query.count()
 
     return {
         "attendance_history": attendance_history,
@@ -91,37 +105,56 @@ async def get_analytics_summary(current_user: User = Depends(get_current_user)):
     if current_user.role not in ["admin", "manager", "super_admin"]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+
     today = datetime.now(timezone.utc).date()
     first_of_month = today.replace(day=1)
     start_of_today = datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc)
     start_of_month = datetime.combine(first_of_month, datetime.min.time(), tzinfo=timezone.utc)
     start_of_tomorrow = start_of_today + timedelta(days=1)
     
-    total_clients = await models.Client.all().count()
-    active_memberships = await Membership.filter(
+    client_query = models.Client.all()
+    if tenant_id is not None:
+        client_query = client_query.filter(tenant_id=tenant_id)
+    total_clients = await client_query.count()
+
+    active_mem_query = Membership.filter(
         status="active",
         end_date__gte=datetime.now(timezone.utc)
-    ).count()
+    )
+    if tenant_id is not None:
+        active_mem_query = active_mem_query.filter(tenant_id=tenant_id)
+    active_memberships = await active_mem_query.count()
     
-    expired_memberships = await Membership.filter(
+    expired_mem_query = Membership.filter(
         Q(status="expired") | Q(end_date__lt=datetime.now(timezone.utc))
-    ).count()
+    )
+    if tenant_id is not None:
+        expired_mem_query = expired_mem_query.filter(tenant_id=tenant_id)
+    expired_memberships = await expired_mem_query.count()
     
-    upcoming_expirations = await Membership.filter(
+    expiring_mem_query = Membership.filter(
         status="active",
         end_date__gte=datetime.now(timezone.utc),
         end_date__lte=datetime.now(timezone.utc) + timedelta(days=30)
-    ).count()
+    )
+    if tenant_id is not None:
+        expiring_mem_query = expiring_mem_query.filter(tenant_id=tenant_id)
+    upcoming_expirations = await expiring_mem_query.count()
 
-    revenue_data = await Membership.filter(
-        start_date__gte=start_of_month
-    ).annotate(total=Sum("price_paid")).values("total")
+    rev_query = Membership.filter(start_date__gte=start_of_month)
+    if tenant_id is not None:
+        rev_query = rev_query.filter(tenant_id=tenant_id)
+    revenue_data = await rev_query.annotate(total=Sum("price_paid")).values("total")
     revenue_month = revenue_data[0]["total"] if revenue_data and revenue_data[0]["total"] else 0
     
-    check_ins_today = await Attendance.filter(
+    checkin_query = Attendance.filter(
         check_in_time__gte=start_of_today,
         check_in_time__lt=start_of_tomorrow
-    ).count()
+    )
+    if tenant_id is not None:
+        checkin_query = checkin_query.filter(tenant_id=tenant_id)
+    check_ins_today = await checkin_query.count()
 
     return {
         "total_clients": total_clients,

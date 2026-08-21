@@ -14,6 +14,12 @@ async def get_current_client(current_user: UserModel = Depends(get_current_user)
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Client profile not found for this user"
         )
+    # Tenant isolation: non-super_admin users can only access their own tenant's data
+    if current_user.role != "super_admin" and client.tenant_id != current_user.tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Client profile not found for this user"
+        )
     return client
 
 @router.get("/me", response_model=schemas.Client)

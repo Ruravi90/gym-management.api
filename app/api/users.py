@@ -22,10 +22,12 @@ async def create_user(user: schemas.UserCreate, current_user: UserModel = Depend
     if user.role == "super_admin" and current_user.role != "super_admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permisos para crear un Super Admin")
 
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+
     db_user = await crud.user.get_user_by_email(email=user.email)
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
-    return await crud.user.create_user(user_data=user.dict())
+    return await crud.user.create_user(user_data=user.dict(), tenant_id=tenant_id)
 
 
 @router.get("", response_model=List[schemas.User])
@@ -33,7 +35,8 @@ async def read_users(skip: int = 0, limit: int = 100, current_user: UserModel = 
     # Only admins/receptionists can list users
     if current_user.role not in ADMIN_ROLES:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
-    users = await crud.user.get_users(skip=skip, limit=limit)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    users = await crud.user.get_users(skip=skip, limit=limit, tenant_id=tenant_id)
     return users
 
 @router.get('/me', response_model=schemas.User)
@@ -49,6 +52,9 @@ async def read_user(user_id: int, current_user: UserModel = Depends(get_current_
     # Allow viewing own profile or allow administrative roles
     if current_user.id != user_id and current_user.role not in ADMIN_ROLES:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
+    # Tenant isolation: non-super_admin users can only see users from their tenant
+    if current_user.role != "super_admin" and db_user.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=404, detail="User not found")
     return db_user
 
 
@@ -60,6 +66,10 @@ async def update_user(user_id: int, user_update: schemas.UserUpdate, current_use
 
     db_user = await crud.user.get_user(user_id=user_id)
     if not db_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    # Tenant isolation: non-super_admin users can only update users from their tenant
+    if current_user.role != "super_admin" and db_user.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
     # Protection for Super Admin
@@ -91,6 +101,10 @@ async def delete_user(user_id: int, current_user: UserModel = Depends(get_curren
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
+    # Tenant isolation: non-super_admin users can only delete users from their tenant
+    if current_user.role != "super_admin" and db_user.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
     # Protection for Super Admin
     if db_user.role == "super_admin" and current_user.role != "super_admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permisos para eliminar a un Super Admin")
@@ -111,6 +125,10 @@ async def change_user_role(user_id: int, role: dict, current_user: UserModel = D
         
     db_user = await crud.user.get_user(user_id=user_id)
     if not db_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    # Tenant isolation: non-super_admin users can only change roles for users from their tenant
+    if current_user.role != "super_admin" and db_user.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
     # Protection for Super Admin target
@@ -138,6 +156,10 @@ async def change_user_status(user_id: int, status_payload: dict, current_user: U
         
     db_user = await crud.user.get_user(user_id=user_id)
     if not db_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    # Tenant isolation: non-super_admin users can only change status for users from their tenant
+    if current_user.role != "super_admin" and db_user.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
     # Protection for Super Admin target

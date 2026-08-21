@@ -22,6 +22,7 @@ from app.api.exercises import router as exercises_router
 from app.api.routines import router as routines_router
 from app.api.mentor import router as mentor_router
 from app.api.measurements import router as measurements_router
+from app.api.tenants import router as tenants_router
 from app.middleware.security import add_security_middleware, limiter, common_limits, auth_limits, file_upload_limits
 from app.services.checkin_notifier import init_redis, close_redis
 
@@ -91,6 +92,8 @@ logger.info("Including mentor router...")
 app.include_router(mentor_router, prefix="/mentor", tags=["mentor"])
 logger.info("Including measurements router...")
 app.include_router(measurements_router, prefix="/measurements", tags=["measurements"])
+logger.info("Including tenants router...")
+app.include_router(tenants_router, prefix="/tenants", tags=["tenants"])
 logger.info("All routers included successfully")
 
 from tortoise.contrib.fastapi import register_tortoise
@@ -130,6 +133,52 @@ async def startup_event():
         
         # Manual emergency fix for missing columns
         logger.info("🛠️  Checking/Applying manual column fixes...")
+
+        # Tenant table
+        try:
+            await conn.execute_query(
+                "CREATE TABLE IF NOT EXISTS `tenants` ("
+                "`id` INT AUTO_INCREMENT PRIMARY KEY,"
+                "`name` VARCHAR(150) NOT NULL,"
+                "`slug` VARCHAR(50) NOT NULL UNIQUE,"
+                "`email` VARCHAR(100),"
+                "`phone` VARCHAR(20),"
+                "`address` LONGTEXT,"
+                "`logo_url` VARCHAR(500),"
+                "`status` VARCHAR(20) NOT NULL DEFAULT 'active',"
+                "`max_users` INT NOT NULL DEFAULT 10,"
+                "`created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+                "`updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+                ")"
+            )
+            logger.info("✅ Created tenants table")
+        except: pass
+
+        # tenant_id columns for all models
+        tenant_columns = [
+            ("users", "tenant_id", "INT"),
+            ("clients", "tenant_id", "INT"),
+            ("membership_types", "tenant_id", "INT"),
+            ("memberships", "tenant_id", "INT"),
+            ("attendance", "tenant_id", "INT"),
+            ("audit_logs", "tenant_id", "INT"),
+            ("exercises", "tenant_id", "INT"),
+            ("routines", "tenant_id", "INT"),
+            ("workout_sessions", "tenant_id", "INT"),
+            ("body_measurements", "tenant_id", "INT"),
+            ("kaizen_habits", "tenant_id", "INT"),
+            ("kaizen_medals", "tenant_id", "INT"),
+            ("xp_logs", "tenant_id", "INT"),
+            ("weekly_challenges", "tenant_id", "INT"),
+            ("classes", "tenant_id", "INT"),
+            ("mentor_messages", "tenant_id", "INT"),
+        ]
+        for table, column, col_type in tenant_columns:
+            try:
+                await conn.execute_query(f"ALTER TABLE `{table}` ADD COLUMN `{column}` {col_type}")
+                logger.info(f"✅ Added {column} to {table}")
+            except: pass
+
         try:
             await conn.execute_query("ALTER TABLE `kaizen_habits` ADD COLUMN `reflection` LONGTEXT")
             logger.info("✅ Added reflection to kaizen_habits")

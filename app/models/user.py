@@ -14,6 +14,7 @@ class UserRoleEnum(str, Enum):
 
 class User(Model):
     id = fields.IntField(pk=True)
+    tenant = fields.ForeignKeyField("models.Tenant", related_name="users", null=True, on_delete=fields.SET_NULL)
     name = fields.CharField(max_length=100)
     email = fields.CharField(max_length=100, unique=True, null=True)
     phone = fields.CharField(max_length=20, null=True)

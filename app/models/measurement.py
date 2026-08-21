@@ -5,6 +5,7 @@ from tortoise import fields
 class BodyMeasurement(Model):
     """Medidas corporales del cliente (registro semanal). Todas las medidas en cm."""
     id = fields.IntField(pk=True)
+    tenant = fields.ForeignKeyField("models.Tenant", related_name="body_measurements", null=True, on_delete=fields.SET_NULL)
     client = fields.ForeignKeyField("models.Client", related_name="body_measurements", on_delete=fields.CASCADE)
     date = fields.DateField()
     weight_kg = fields.DecimalField(max_digits=6, decimal_places=2, null=True)

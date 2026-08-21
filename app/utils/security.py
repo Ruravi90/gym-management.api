@@ -31,6 +31,17 @@ def require_admin(current_user: User = Depends(get_current_user)):
         )
     return current_user
 
+def require_super_admin(current_user: User = Depends(get_current_user)):
+    """
+    Dependency to require super_admin role for accessing endpoints.
+    """
+    if current_user.role != UserRoleEnum.SUPER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Se requiere acceso de Super Admin"
+        )
+    return current_user
+
 def require_authenticated_user(current_user: User = Depends(get_current_user)):
     """
     Dependency to require any authenticated user.
@@ -39,6 +50,7 @@ def require_authenticated_user(current_user: User = Depends(get_current_user)):
 
 # Pre-defined reusable dependencies
 AdminOnly = Depends(require_admin)
+SuperAdminOnly = Depends(require_super_admin)
 ManagerOrAbove = Depends(require_role([UserRoleEnum.ADMIN, UserRoleEnum.SUPER_ADMIN, UserRoleEnum.MANAGER]))
 ReceptionistOrAbove = Depends(require_role([
     UserRoleEnum.ADMIN, 

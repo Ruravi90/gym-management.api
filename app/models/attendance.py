@@ -5,6 +5,7 @@ from datetime import datetime
 
 class Attendance(Model):
     id = fields.IntField(pk=True)
+    tenant = fields.ForeignKeyField("models.Tenant", related_name="attendances", null=True, on_delete=fields.SET_NULL)
     client = fields.ForeignKeyField("models.Client", related_name="attendances", on_delete=fields.CASCADE)
     check_in_time = fields.DatetimeField(auto_now_add=True)
     check_out_time = fields.DatetimeField(null=True)

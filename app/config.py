@@ -1,12 +1,14 @@
 import os
 import warnings
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+
     # Database configuration for Tortoise ORM
-    DATABASE_URL: str = os.getenv("DATABASE_URL")
+    DATABASE_URL: str
     # Secret key for JWT tokens - should be set in Railway environment
-    SECRET_KEY: str = os.getenv("SECRET_KEY")
+    SECRET_KEY: str
 
     # Algorithm for JWT
     ALGORITHM: str = os.getenv("ALGORITHM", "HS256")

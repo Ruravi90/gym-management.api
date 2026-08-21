@@ -26,20 +26,23 @@ def get_face_service() -> FacialRecognitionService:
 
 @router.post("", response_model=schemas.Attendance)
 async def create_attendance(attendance: schemas.AttendanceCreate, current_user: UserModel = Depends(get_current_user)):
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
     # Verify client exists
-    client = await crud.client.get_client(client_id=attendance.client_id)
+    client = await crud.client.get_client(client_id=attendance.client_id, tenant_id=tenant_id)
     if not client:
          raise HTTPException(status_code=404, detail="Client not found")
     return await crud.attendance.create_attendance(
         attendance.dict(),
         user_id=current_user.id,
-        ip_address=None,  # Will be populated later with request info
-        user_agent=None   # Will be populated later with request info
+        ip_address=None,
+        user_agent=None,
+        tenant_id=tenant_id,
     )
 
 @router.get("/client/{client_id}", response_model=List[schemas.Attendance])
-async def read_attendances(client_id: int):
-    return await crud.attendance.get_attendance_by_client(client_id=client_id)
+async def read_attendances(client_id: int, current_user: UserModel = Depends(get_current_user)):
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    return await crud.attendance.get_attendance_by_client(client_id=client_id, tenant_id=tenant_id)
 
 @router.post("/check-in", response_model=schemas.Attendance)
 @limiter.limit("60 per minute")  # Higher limit for check-in since it's used frequently
@@ -74,8 +77,9 @@ async def check_in(request: Request, file: UploadFile = File(...)):
 
 @router.post("/manual/{client_id}", response_model=schemas.Attendance)
 async def check_in_manual(client_id: int, current_user: UserModel = Depends(get_current_user)):
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
     # Verify client exists
-    client = await crud.client.get_client(client_id=client_id)
+    client = await crud.client.get_client(client_id=client_id, tenant_id=tenant_id)
     if not client:
          raise HTTPException(status_code=404, detail="Client not found")
 
@@ -88,13 +92,14 @@ async def check_in_manual(client_id: int, current_user: UserModel = Depends(get_
         # Check in
         attendance_data = {
             "client_id": client_id,
-            "device_id": None  # Will be set by the model automatically
+            "device_id": None
         }
         attendance = await crud.attendance.create_attendance(
             attendance_data,
             user_id=current_user.id,
-            ip_address=None,  # Will be populated later with request info
-            user_agent=None   # Will be populated later with request info
+            ip_address=None,
+            user_agent=None,
+            tenant_id=tenant_id,
         )
 
     return attendance

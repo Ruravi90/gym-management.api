@@ -5,6 +5,7 @@ from datetime import datetime
 
 class GymClass(Model):
     id = fields.IntField(pk=True)
+    tenant = fields.ForeignKeyField("models.Tenant", related_name="classes", null=True, on_delete=fields.SET_NULL)
     name = fields.CharField(max_length=100)
     description = fields.TextField(null=True)
     instructor = fields.CharField(max_length=100)

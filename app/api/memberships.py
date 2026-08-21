@@ -25,26 +25,27 @@ async def create_membership(
             detail="Not authorized to create memberships"
         )
 
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+
     # Verify client exists
-    client = await crud.client.get_client(membership.client_id)
+    client = await crud.client.get_client(membership.client_id, tenant_id=tenant_id)
     if not client:
          raise HTTPException(status_code=404, detail="Client not found")
     
     # Check if client already has an active membership
-    active_membership = await crud.membership.get_active_membership(membership.client_id)
+    active_membership = await crud.membership.get_active_membership(membership.client_id, tenant_id=tenant_id)
     if active_membership:
         raise HTTPException(
             status_code=400, 
             detail="El cliente ya tiene una membresía activa. Por favor, expire o cancele la membresía actual antes de agregar una nueva."
         )
 
-
-    
     return await crud.membership.create_membership(
         membership.dict(),
         user_id=current_user.id,
-        ip_address=None,  # Will be populated later with request info
-        user_agent=None   # Will be populated later with request info
+        ip_address=None,
+        user_agent=None,
+        tenant_id=tenant_id,
     )
 
 
@@ -60,7 +61,8 @@ async def read_memberships(
             status_code=403,
             detail="Not authorized to view memberships"
         )
-    memberships = await crud.membership.get_memberships(skip=skip, limit=limit)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    memberships = await crud.membership.get_memberships(skip=skip, limit=limit, tenant_id=tenant_id)
     return memberships
 
 
@@ -75,11 +77,13 @@ async def read_membership_statistics(
             detail="Not authorized to view membership statistics"
         )
 
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+
     # Get various membership statistics
-    total_memberships = await crud.membership.get_total_memberships_count()
-    active_memberships = await crud.membership.get_active_memberships_count()
-    expired_memberships = await crud.membership.get_expired_memberships_count()
-    upcoming_expirations = await crud.membership.get_upcoming_expirations(days=30)  # Next 30 days
+    total_memberships = await crud.membership.get_total_memberships_count(tenant_id=tenant_id)
+    active_memberships = await crud.membership.get_active_memberships_count(tenant_id=tenant_id)
+    expired_memberships = await crud.membership.get_expired_memberships_count(tenant_id=tenant_id)
+    upcoming_expirations = await crud.membership.get_upcoming_expirations(days=30, tenant_id=tenant_id)
 
     return {
         "total_memberships": total_memberships,
@@ -95,7 +99,8 @@ async def read_membership(
     membership_id: int,
     current_user: User = Depends(get_current_user)
 ):
-    db_membership = await crud.membership.get_membership(membership_id=membership_id)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    db_membership = await crud.membership.get_membership(membership_id=membership_id, tenant_id=tenant_id)
     if db_membership is None:
         raise HTTPException(status_code=404, detail="Membership not found")
 
@@ -115,7 +120,8 @@ async def update_membership(
     membership_update: schemas.MembershipUpdate,
     current_user: User = Depends(get_current_user)
 ):
-    db_membership = await crud.membership.get_membership(membership_id=membership_id)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    db_membership = await crud.membership.get_membership(membership_id=membership_id, tenant_id=tenant_id)
     if db_membership is None:
         raise HTTPException(status_code=404, detail="Membership not found")
 
@@ -130,8 +136,9 @@ async def update_membership(
         membership_id=membership_id,
         membership_update=membership_update.dict(exclude_unset=True),
         user_id=current_user.id,
-        ip_address=None,  # Will be populated later with request info
-        user_agent=None   # Will be populated later with request info
+        ip_address=None,
+        user_agent=None,
+        tenant_id=tenant_id,
     )
 
 
@@ -140,7 +147,8 @@ async def delete_membership(
     membership_id: int,
     current_user: User = Depends(get_current_user)
 ):
-    db_membership = await crud.membership.get_membership(membership_id=membership_id)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    db_membership = await crud.membership.get_membership(membership_id=membership_id, tenant_id=tenant_id)
     if db_membership is None:
         raise HTTPException(status_code=404, detail="Membership not found")
 
@@ -154,8 +162,9 @@ async def delete_membership(
     return await crud.membership.delete_membership(
         membership_id=membership_id,
         user_id=current_user.id,
-        ip_address=None,  # Will be populated later with request info
-        user_agent=None   # Will be populated later with request info
+        ip_address=None,
+        user_agent=None,
+        tenant_id=tenant_id,
     )
 
 
@@ -171,26 +180,29 @@ async def read_memberships_by_client(
             detail="Not authorized to view this client's memberships"
         )
 
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+
     # Verify client exists
-    client = await crud.client.get_client(client_id=client_id)
+    client = await crud.client.get_client(client_id=client_id, tenant_id=tenant_id)
     if not client:
          raise HTTPException(status_code=404, detail="Client not found")
-    memberships = await crud.membership.get_memberships_by_client(client_id=client_id)
+    memberships = await crud.membership.get_memberships_by_client(client_id=client_id, tenant_id=tenant_id)
     return memberships
 
 
 @router.get("/client/{client_id}/active", response_model=schemas.Membership)
 async def read_active_membership(
-    client_id: int
+    client_id: int,
+    current_user: User = Depends(get_current_user)
 ):
-    # This endpoint is made public to allow the facial check-in kiosk
-    # to verify membership status without a logged-in session.
+    # This endpoint was public for the facial check-in kiosk, now requires auth for tenant scoping
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
 
     # Verify client exists
-    client = await crud.client.get_client(client_id=client_id)
+    client = await crud.client.get_client(client_id=client_id, tenant_id=tenant_id)
     if not client:
          raise HTTPException(status_code=404, detail="Client not found")
-    membership = await crud.membership.get_active_membership(client_id=client_id)
+    membership = await crud.membership.get_active_membership(client_id=client_id, tenant_id=tenant_id)
     if not membership:
         raise HTTPException(status_code=404, detail="Active membership not found")
     return membership
@@ -207,7 +219,8 @@ async def read_memberships_by_status(
             status_code=403,
             detail="Only authorized users can view memberships by status"
         )
-    memberships = await crud.membership.get_memberships_by_status(status=status)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    memberships = await crud.membership.get_memberships_by_status(status=status, tenant_id=tenant_id)
     return memberships
 
 
@@ -222,7 +235,8 @@ async def read_memberships_by_payment_status(
             status_code=403,
             detail="Only authorized users can view memberships by payment status"
         )
-    memberships = await crud.membership.get_memberships_by_payment_status(payment_status=payment_status)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    memberships = await crud.membership.get_memberships_by_payment_status(payment_status=payment_status, tenant_id=tenant_id)
     return memberships
 
 
@@ -239,13 +253,15 @@ async def read_membership_history(
             detail="Not authorized to view this client's membership history"
         )
 
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+
     # Verify client exists
-    client = await crud.client.get_client(client_id=client_id)
+    client = await crud.client.get_client(client_id=client_id, tenant_id=tenant_id)
     if not client:
          raise HTTPException(status_code=404, detail="Client not found")
 
     # Get all memberships for the client (past and present)
-    memberships = await crud.membership.get_memberships_by_client(client_id=client_id)
+    memberships = await crud.membership.get_memberships_by_client(client_id=client_id, tenant_id=tenant_id)
     return memberships
 
 
@@ -267,7 +283,8 @@ async def read_membership_types(
             detail="Not authorized to view membership types"
         )
 
-    return await crud.membership.get_membership_types(skip=skip, limit=limit, active_only=active_only)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    return await crud.membership.get_membership_types(skip=skip, limit=limit, active_only=active_only, tenant_id=tenant_id)
 
 
 @router.post("/types", response_model=schemas.MembershipType)
@@ -285,11 +302,14 @@ async def create_membership_type(
             detail="Not authorized to create membership types"
         )
 
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+
     return await crud.membership.create_membership_type(
         membership_type.dict(),
         user_id=current_user.id,
-        ip_address=None,  # Will be populated later with request info
-        user_agent=None   # Will be populated later with request info
+        ip_address=None,
+        user_agent=None,
+        tenant_id=tenant_id,
     )
 
 
@@ -308,7 +328,8 @@ async def read_membership_type(
             detail="Not authorized to view membership types"
         )
 
-    db_membership_type = await crud.membership.get_membership_type(membership_type_id=membership_type_id)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    db_membership_type = await crud.membership.get_membership_type(membership_type_id=membership_type_id, tenant_id=tenant_id)
     if db_membership_type is None:
         raise HTTPException(status_code=404, detail="Membership type not found")
 
@@ -331,7 +352,9 @@ async def update_membership_type(
             detail="Not authorized to update membership types"
         )
 
-    db_membership_type = await crud.membership.get_membership_type(membership_type_id=membership_type_id)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+
+    db_membership_type = await crud.membership.get_membership_type(membership_type_id=membership_type_id, tenant_id=tenant_id)
     if db_membership_type is None:
         raise HTTPException(status_code=404, detail="Membership type not found")
 
@@ -339,8 +362,9 @@ async def update_membership_type(
         membership_type_id=membership_type_id,
         membership_type_update=membership_type_update.dict(exclude_unset=True),
         user_id=current_user.id,
-        ip_address=None,  # Will be populated later with request info
-        user_agent=None   # Will be populated later with request info
+        ip_address=None,
+        user_agent=None,
+        tenant_id=tenant_id,
     )
 
 
@@ -359,15 +383,18 @@ async def delete_membership_type(
             detail="Only admin users can deactivate membership types"
         )
 
-    db_membership_type = await crud.membership.get_membership_type(membership_type_id=membership_type_id)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+
+    db_membership_type = await crud.membership.get_membership_type(membership_type_id=membership_type_id, tenant_id=tenant_id)
     if db_membership_type is None:
         raise HTTPException(status_code=404, detail="Membership type not found")
 
     return await crud.membership.delete_membership_type(
         membership_type_id=membership_type_id,
         user_id=current_user.id,
-        ip_address=None,  # Will be populated later with request info
-        user_agent=None   # Will be populated later with request info
+        ip_address=None,
+        user_agent=None,
+        tenant_id=tenant_id,
     )
 
 
@@ -387,7 +414,9 @@ async def use_membership_access(
             detail="Not authorized to log access usage"
         )
 
-    db_membership = await crud.membership.get_membership(membership_id=membership_id)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+
+    db_membership = await crud.membership.get_membership(membership_id=membership_id, tenant_id=tenant_id)
     if db_membership is None:
         raise HTTPException(status_code=404, detail="Membership not found")
 
@@ -399,7 +428,7 @@ async def use_membership_access(
         )
 
     # Check if access limit has been reached
-    membership_type = await crud.membership.get_membership_type(db_membership.membership_type_id)
+    membership_type = await crud.membership.get_membership_type(db_membership.membership_type_id, tenant_id=tenant_id)
     if membership_type and db_membership.accesses_used >= membership_type.accesses_allowed:
         raise HTTPException(
             status_code=400,
@@ -446,4 +475,6 @@ async def validate_client_access(
             detail="Not authorized to validate access"
         )
 
-    return await crud.membership.validate_membership_access(client_id=client_id)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+
+    return await crud.membership.validate_membership_access(client_id=client_id, tenant_id=tenant_id)

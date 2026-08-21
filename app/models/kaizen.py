@@ -18,6 +18,7 @@ class MedalType(str, Enum):
 
 class KaizenHabit(Model):
     id = fields.IntField(pk=True)
+    tenant = fields.ForeignKeyField("models.Tenant", related_name="kaizen_habits", null=True, on_delete=fields.SET_NULL)
     client = fields.ForeignKeyField("models.Client", related_name="kaizen_habits", on_delete=fields.CASCADE)
     name = fields.CharField(max_length=255)
     reflection = fields.TextField(null=True)
@@ -54,6 +55,7 @@ class KaizenLog(Model):
 
 class KaizenMedal(Model):
     id = fields.IntField(pk=True)
+    tenant = fields.ForeignKeyField("models.Tenant", related_name="kaizen_medals", null=True, on_delete=fields.SET_NULL)
     client = fields.ForeignKeyField("models.Client", related_name="kaizen_medals", on_delete=fields.CASCADE)
     type = fields.CharEnumField(MedalType)
     description = fields.CharField(max_length=255)

@@ -26,6 +26,7 @@ class CriteriaType(str, Enum):
 
 class XpLog(Model):
     id = fields.IntField(pk=True)
+    tenant = fields.ForeignKeyField("models.Tenant", related_name="xp_logs", null=True, on_delete=fields.SET_NULL)
     client = fields.ForeignKeyField("models.Client", related_name="xp_logs", on_delete=fields.CASCADE)
     action_type = fields.CharEnumField(ActionType)
     xp_amount = fields.IntField()
@@ -75,6 +76,7 @@ class ClientAchievement(Model):
 
 class WeeklyChallenge(Model):
     id = fields.IntField(pk=True)
+    tenant = fields.ForeignKeyField("models.Tenant", related_name="weekly_challenges", null=True, on_delete=fields.SET_NULL)
     title = fields.CharField(max_length=100)
     description = fields.CharField(max_length=255)
     xp_reward = fields.IntField(default=0)

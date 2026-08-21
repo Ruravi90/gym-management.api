@@ -142,13 +142,16 @@ async def register(request: Request, user_data: schemas.UserRegister):
         "password": user_data.password
     }
 
-    user = await crud.user.create_user(user_data=user_dict)
+    # Assign to the default tenant if tenant_id is provided
+    tenant_id = getattr(user_data, 'tenant_id', None)
+
+    user = await crud.user.create_user(user_data=user_dict, tenant_id=tenant_id)
 
     # Automatically link existing client profile if found or create a new one
-    client = await crud.client.get_client_by_email(email=user_data.email)
+    client = await crud.client.get_client_by_email(email=user_data.email, tenant_id=tenant_id)
     if client:
         if client.user_id is None:
-            await crud.client.update_client(client_id=client.id, client_update={"user_id": user.id})
+            await crud.client.update_client(client_id=client.id, client_update={"user_id": user.id}, tenant_id=tenant_id)
     else:
         # Create a new client profile for the user
         await crud.client.create_client(client_data={
@@ -157,7 +160,7 @@ async def register(request: Request, user_data: schemas.UserRegister):
             "phone": user_data.phone,
             "user_id": user.id,
             "status": True
-        })
+        }, tenant_id=tenant_id)
 
     return user
 

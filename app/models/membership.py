@@ -5,7 +5,8 @@ from datetime import datetime
 
 class MembershipType(Model):
     id = fields.IntField(pk=True)
-    name = fields.CharField(max_length=50, unique=True)  # "Day Pass", "Weekly", "Monthly", "Annual"
+    tenant = fields.ForeignKeyField("models.Tenant", related_name="membership_types", null=True, on_delete=fields.SET_NULL)
+    name = fields.CharField(max_length=50)  # "Day Pass", "Weekly", "Monthly", "Annual"
     duration_days = fields.IntField(null=True)  # 1 for day pass, 7 for weekly, 30 for monthly, 365 for annual
     accesses_allowed = fields.IntField(null=True)  # None means unlimited, specific number for punch passes
     price = fields.FloatField()
@@ -27,6 +28,7 @@ class MembershipType(Model):
 
 class Membership(Model):
     id = fields.IntField(pk=True)
+    tenant = fields.ForeignKeyField("models.Tenant", related_name="memberships", null=True, on_delete=fields.SET_NULL)
     client = fields.ForeignKeyField("models.Client", related_name="memberships", on_delete=fields.CASCADE)
     membership_type = fields.ForeignKeyField(
         "models.MembershipType", related_name="memberships", null=True, on_delete=fields.SET_NULL

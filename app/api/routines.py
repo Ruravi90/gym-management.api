@@ -12,11 +12,13 @@ async def get_current_client(current_user: User = Depends(get_current_user)):
     """Obtiene (o crea) el perfil de cliente del usuario autenticado."""
     client = await Client.get_or_none(user_id=current_user.id)
     if not client:
+        tenant_id = getattr(current_user, 'tenant_id', None)
         client = await Client.create(
             name=current_user.name,
             email=current_user.email,
             phone=current_user.phone,
             user_id=current_user.id,
+            tenant_id=tenant_id,
         )
     return client
 

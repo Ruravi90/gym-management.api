@@ -37,6 +37,7 @@ async def get_audit_logs(
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid action type: {action_type}")
     
+    tenant_id = None if current_user.role == "super_admin" else getattr(current_user, 'tenant_id', None)
     audit_logs = await crud.audit_log.get_audit_logs(
         skip=skip,
         limit=limit,
@@ -45,7 +46,8 @@ async def get_audit_logs(
         entity_id=entity_id,
         action_type=action_type_enum,
         start_date=start_date,
-        end_date=end_date
+        end_date=end_date,
+        tenant_id=tenant_id,
     )
     return audit_logs
 
@@ -62,7 +64,8 @@ async def get_audit_log(
     if current_user.role not in [UserRoleEnum.SUPER_ADMIN, UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
         raise HTTPException(status_code=403, detail="Not enough permissions")
     
-    db_audit_log = await crud.audit_log.get_audit_log(audit_log_id)
+    tenant_id = None if current_user.role == "super_admin" else getattr(current_user, 'tenant_id', None)
+    db_audit_log = await crud.audit_log.get_audit_log(audit_log_id, tenant_id=tenant_id)
     if not db_audit_log:
         raise HTTPException(status_code=404, detail="Audit log not found")
     return db_audit_log
@@ -81,9 +84,11 @@ async def get_audit_logs_by_entity(
     if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
         raise HTTPException(status_code=403, detail="Not enough permissions")
     
+    tenant_id = None if current_user.role == "super_admin" else getattr(current_user, 'tenant_id', None)
     audit_logs = await crud.audit_log.get_audit_logs_by_entity(
         entity_type=entity_type,
-        entity_id=entity_id
+        entity_id=entity_id,
+        tenant_id=tenant_id,
     )
     return audit_logs
 
@@ -103,5 +108,6 @@ async def get_audit_logs_by_user(
     if current_user.role not in [UserRoleEnum.SUPER_ADMIN, UserRoleEnum.ADMIN, UserRoleEnum.MANAGER] and current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Not enough permissions")
     
-    audit_logs = await crud.audit_log.get_audit_logs_by_user(user_id=user_id)
+    tenant_id = None if current_user.role == "super_admin" else getattr(current_user, 'tenant_id', None)
+    audit_logs = await crud.audit_log.get_audit_logs_by_user(user_id=user_id, tenant_id=tenant_id)
     return audit_logs

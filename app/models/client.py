@@ -5,6 +5,7 @@ from datetime import datetime
 
 class Client(Model):
     id = fields.IntField(pk=True)
+    tenant = fields.ForeignKeyField("models.Tenant", related_name="clients", null=True, on_delete=fields.SET_NULL)
     name = fields.CharField(max_length=100)
     email = fields.CharField(max_length=100, null=True)
     phone = fields.CharField(max_length=20, null=True)

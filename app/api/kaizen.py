@@ -10,12 +10,13 @@ router = APIRouter()
 async def get_current_client(current_user: UserModel = Depends(get_current_user)):
     client = await Client.get_or_none(user_id=current_user.id)
     if not client:
-        # Auto-create client profile for users who don't have one
+        tenant_id = getattr(current_user, 'tenant_id', None)
         client = await Client.create(
             name=current_user.name,
             email=current_user.email,
             phone=current_user.phone,
-            user_id=current_user.id
+            user_id=current_user.id,
+            tenant_id=tenant_id,
         )
     return client
 

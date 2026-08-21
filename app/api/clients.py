@@ -20,28 +20,32 @@ def get_face_service() -> FacialRecognitionService:
 
 @router.post("", response_model=schemas.Client)
 async def create_client(client: schemas.ClientCreate, current_user: UserModel = Depends(get_current_user)):
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+
     if client.email:
-        db_client = await crud.client.get_client_by_email(email=client.email)
+        db_client = await crud.client.get_client_by_email(email=client.email, tenant_id=tenant_id)
         if db_client:
             raise HTTPException(status_code=400, detail="Email already registered")
 
     if client.phone:
-        db_client = await crud.client.get_client_by_phone(phone=client.phone)
+        db_client = await crud.client.get_client_by_phone(phone=client.phone, tenant_id=tenant_id)
         if db_client:
             raise HTTPException(status_code=400, detail="Phone already registered")
             
     return await crud.client.create_client(
         client_data=client.dict(),
         user_id=current_user.id,
-        ip_address=None,  # Will be populated later with request info
-        user_agent=None   # Will be populated later with request info
+        ip_address=None,
+        user_agent=None,
+        tenant_id=tenant_id,
     )
 
 @router.get("", response_model=List[schemas.Client])
 async def read_clients(skip: int = 0, limit: int = 100, current_user: UserModel = Depends(get_current_user)):
     try:
-        logger.debug(f"accessing read_clients. User: {current_user.email}, Skip: {skip}, Limit: {limit}")
-        clients = await crud.client.get_clients(skip=skip, limit=limit)
+        tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+        logger.debug(f"accessing read_clients. User: {current_user.email}, Skip: {skip}, Limit: {limit}, tenant_id: {tenant_id}")
+        clients = await crud.client.get_clients(skip=skip, limit=limit, tenant_id=tenant_id)
         logger.debug(f"retrieved {len(clients)} clients")
         return clients
     except Exception as e:
@@ -52,44 +56,51 @@ async def read_clients(skip: int = 0, limit: int = 100, current_user: UserModel 
 
 @router.get("/search/", response_model=List[schemas.Client])
 async def search_clients(search: str, skip: int = 0, limit: int = 100, current_user: UserModel = Depends(get_current_user)):
-    clients = await crud.client.search_clients(search_term=search, skip=skip, limit=limit)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    clients = await crud.client.search_clients(search_term=search, skip=skip, limit=limit, tenant_id=tenant_id)
     return clients
 
 @router.get("/{client_id}", response_model=schemas.Client)
 async def read_client(client_id: int, current_user: UserModel = Depends(get_current_user)):
-    db_client = await crud.client.get_client(client_id=client_id)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    db_client = await crud.client.get_client(client_id=client_id, tenant_id=tenant_id)
     if db_client is None:
         raise HTTPException(status_code=404, detail="Client not found")
     return db_client
 
 @router.put("/{client_id}", response_model=schemas.Client)
 async def update_client(client_id: int, client_update: schemas.ClientUpdate, current_user: UserModel = Depends(get_current_user)):
-    db_client = await crud.client.get_client(client_id=client_id)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    db_client = await crud.client.get_client(client_id=client_id, tenant_id=tenant_id)
     if db_client is None:
         raise HTTPException(status_code=404, detail="Client not found")
     return await crud.client.update_client(
         client_id=client_id,
         client_update=client_update.dict(exclude_unset=True),
         user_id=current_user.id,
-        ip_address=None,  # Will be populated later with request info
-        user_agent=None   # Will be populated later with request info
+        ip_address=None,
+        user_agent=None,
+        tenant_id=tenant_id,
     )
 
 @router.delete("/{client_id}", response_model=schemas.Client)
 async def delete_client(client_id: int, current_user: UserModel = Depends(get_current_user)):
-    db_client = await crud.client.get_client(client_id=client_id)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    db_client = await crud.client.get_client(client_id=client_id, tenant_id=tenant_id)
     if db_client is None:
         raise HTTPException(status_code=404, detail="Client not found")
     return await crud.client.delete_client(
         client_id=client_id,
         user_id=current_user.id,
-        ip_address=None,  # Will be populated later with request info
-        user_agent=None   # Will be populated later with request info
+        ip_address=None,
+        user_agent=None,
+        tenant_id=tenant_id,
     )
 
 @router.post("/{client_id}/face")
 async def register_face(client_id: int, file: UploadFile = File(...), current_user: UserModel = Depends(get_current_user)):
-    client = await crud.client.get_client(client_id=client_id)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    client = await crud.client.get_client(client_id=client_id, tenant_id=tenant_id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
 
@@ -103,7 +114,8 @@ async def register_face(client_id: int, file: UploadFile = File(...), current_us
 @router.get("/{client_id}/face")
 async def get_face_registration_status(client_id: int, current_user: UserModel = Depends(get_current_user)):
     """Check if client has registered their face"""
-    client = await crud.client.get_client(client_id=client_id)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    client = await crud.client.get_client(client_id=client_id, tenant_id=tenant_id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
 
@@ -116,7 +128,8 @@ async def get_face_registration_status(client_id: int, current_user: UserModel =
 @router.delete("/{client_id}/face")
 async def remove_face_registration(client_id: int, current_user: UserModel = Depends(get_current_user)):
     """Remove face registration for a client"""
-    client = await crud.client.get_client(client_id=client_id)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    client = await crud.client.get_client(client_id=client_id, tenant_id=tenant_id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
 

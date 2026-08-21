@@ -14,6 +14,7 @@ class ActionTypeEnum(str, Enum):
 
 class AuditLog(Model):
     id = fields.IntField(pk=True)
+    tenant = fields.ForeignKeyField("models.Tenant", related_name="audit_logs", null=True, on_delete=fields.SET_NULL)
     action_type = fields.CharEnumField(ActionTypeEnum, max_length=10)
     user_id = fields.IntField(null=True)  # ID of the user who performed the action
     entity_type = fields.CharField(max_length=50)  # Type of entity (Client, Membership, etc.)

@@ -15,7 +15,8 @@ async def create_gym_class(
     """Create a new gym class (admin only)"""
     if current_user.role not in ("admin", "super_admin", "manager"):
         raise HTTPException(status_code=403, detail="Not enough permissions")
-    return await crud.gym_class.create_gym_class(class_data=gym_class.dict())
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    return await crud.gym_class.create_gym_class(class_data=gym_class.dict(), tenant_id=tenant_id)
 
 
 @router.get("", response_model=List[schemas.GymClass])
@@ -25,7 +26,8 @@ async def read_gym_classes(
     current_user: UserModel = Depends(get_current_user)
 ):
     """Get all gym classes"""
-    return await crud.gym_class.get_gym_classes(skip=skip, limit=limit)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    return await crud.gym_class.get_gym_classes(skip=skip, limit=limit, tenant_id=tenant_id)
 
 
 @router.get("/upcoming", response_model=List[schemas.GymClass])
@@ -35,7 +37,8 @@ async def read_upcoming_classes(
     current_user: UserModel = Depends(get_current_user)
 ):
     """Get upcoming scheduled classes"""
-    return await crud.gym_class.get_upcoming_classes(skip=skip, limit=limit)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    return await crud.gym_class.get_upcoming_classes(skip=skip, limit=limit, tenant_id=tenant_id)
 
 
 @router.get("/{class_id}", response_model=schemas.GymClass)
@@ -44,7 +47,8 @@ async def read_gym_class(
     current_user: UserModel = Depends(get_current_user)
 ):
     """Get a specific gym class"""
-    db_class = await crud.gym_class.get_gym_class(class_id=class_id)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    db_class = await crud.gym_class.get_gym_class(class_id=class_id, tenant_id=tenant_id)
     if db_class is None:
         raise HTTPException(status_code=404, detail="Class not found")
     return db_class
@@ -59,12 +63,14 @@ async def update_gym_class(
     """Update a gym class (admin only)"""
     if current_user.role not in ("admin", "super_admin", "manager"):
         raise HTTPException(status_code=403, detail="Not enough permissions")
-    db_class = await crud.gym_class.get_gym_class(class_id=class_id)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    db_class = await crud.gym_class.get_gym_class(class_id=class_id, tenant_id=tenant_id)
     if db_class is None:
         raise HTTPException(status_code=404, detail="Class not found")
     return await crud.gym_class.update_gym_class(
         class_id=class_id,
-        class_update=class_update.dict(exclude_unset=True)
+        class_update=class_update.dict(exclude_unset=True),
+        tenant_id=tenant_id,
     )
 
 
@@ -76,7 +82,8 @@ async def delete_gym_class(
     """Delete a gym class (admin only)"""
     if current_user.role not in ("admin", "super_admin", "manager"):
         raise HTTPException(status_code=403, detail="Not enough permissions")
-    db_class = await crud.gym_class.get_gym_class(class_id=class_id)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    db_class = await crud.gym_class.get_gym_class(class_id=class_id, tenant_id=tenant_id)
     if db_class is None:
         raise HTTPException(status_code=404, detail="Class not found")
-    return await crud.gym_class.delete_gym_class(class_id=class_id)
+    return await crud.gym_class.delete_gym_class(class_id=class_id, tenant_id=tenant_id)

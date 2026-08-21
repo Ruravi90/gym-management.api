@@ -24,7 +24,8 @@ async def read_membership_types(
             detail="Not authorized to view membership types"
         )
 
-    return await crud.membership.get_membership_types(skip=skip, limit=limit, active_only=active_only)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    return await crud.membership.get_membership_types(skip=skip, limit=limit, active_only=active_only, tenant_id=tenant_id)
 
 
 @router.post("", response_model=schemas.MembershipType)
@@ -42,7 +43,14 @@ async def create_membership_type(
             detail="Not authorized to create membership types"
         )
 
-    return await crud.membership.create_membership_type(membership_type_data=membership_type.dict())
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    return await crud.membership.create_membership_type(
+        membership_type_data=membership_type.dict(),
+        user_id=current_user.id,
+        ip_address=None,
+        user_agent=None,
+        tenant_id=tenant_id,
+    )
 
 
 @router.get("/{membership_type_id}", response_model=schemas.MembershipType)
@@ -60,7 +68,8 @@ async def read_membership_type(
             detail="Not authorized to view membership types"
         )
 
-    db_membership_type = await crud.membership.get_membership_type(membership_type_id=membership_type_id)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    db_membership_type = await crud.membership.get_membership_type(membership_type_id=membership_type_id, tenant_id=tenant_id)
     if db_membership_type is None:
         raise HTTPException(status_code=404, detail="Membership type not found")
 
@@ -83,13 +92,18 @@ async def update_membership_type(
             detail="Not authorized to update membership types"
         )
 
-    db_membership_type = await crud.membership.get_membership_type(membership_type_id=membership_type_id)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    db_membership_type = await crud.membership.get_membership_type(membership_type_id=membership_type_id, tenant_id=tenant_id)
     if db_membership_type is None:
         raise HTTPException(status_code=404, detail="Membership type not found")
 
     return await crud.membership.update_membership_type(
         membership_type_id=membership_type_id,
-        membership_type_update=membership_type_update.dict(exclude_unset=True)
+        membership_type_update=membership_type_update.dict(exclude_unset=True),
+        user_id=current_user.id,
+        ip_address=None,
+        user_agent=None,
+        tenant_id=tenant_id,
     )
 
 
@@ -108,8 +122,15 @@ async def delete_membership_type(
             detail="Only admin users can deactivate membership types"
         )
 
-    db_membership_type = await crud.membership.get_membership_type(membership_type_id=membership_type_id)
+    tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    db_membership_type = await crud.membership.get_membership_type(membership_type_id=membership_type_id, tenant_id=tenant_id)
     if db_membership_type is None:
         raise HTTPException(status_code=404, detail="Membership type not found")
 
-    return await crud.membership.delete_membership_type(membership_type_id=membership_type_id)
+    return await crud.membership.delete_membership_type(
+        membership_type_id=membership_type_id,
+        user_id=current_user.id,
+        ip_address=None,
+        user_agent=None,
+        tenant_id=tenant_id,
+    )

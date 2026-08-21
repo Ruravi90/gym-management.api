@@ -1,4 +1,5 @@
 print("Loading models __init__.py...")
+from .tenant import Tenant, TenantStatus
 from .user import User, UserRoleEnum
 from .client import Client
 from .membership import Membership, MembershipType
@@ -13,6 +14,8 @@ from .mentor_message import MentorMessage
 from .gamification import XpLog, AchievementDefinition, ClientAchievement, WeeklyChallenge, ClientChallenge, ActionType, CriteriaType
 
 __all__ = [
+    "Tenant",
+    "TenantStatus",
     "User",
     "UserRoleEnum",
     "Client",

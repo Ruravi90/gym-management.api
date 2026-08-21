@@ -5,6 +5,7 @@ from tortoise import fields
 class Exercise(Model):
     """Catálogo de ejercicios con GIF/video de demostración."""
     id = fields.IntField(pk=True)
+    tenant = fields.ForeignKeyField("models.Tenant", related_name="exercises", null=True, on_delete=fields.SET_NULL)
     name = fields.CharField(max_length=150)
     description = fields.TextField(null=True)
     muscle_group = fields.CharField(max_length=100, null=True)
@@ -35,6 +36,7 @@ class Exercise(Model):
 class Routine(Model):
     """Rutina asignada a un cliente (puede ser creada por staff o por el propio cliente)."""
     id = fields.IntField(pk=True)
+    tenant = fields.ForeignKeyField("models.Tenant", related_name="routines", null=True, on_delete=fields.SET_NULL)
     client = fields.ForeignKeyField("models.Client", related_name="routines", on_delete=fields.CASCADE)
     created_by = fields.ForeignKeyField("models.User", related_name="created_routines", null=True, on_delete=fields.SET_NULL)
     name = fields.CharField(max_length=150)
@@ -92,6 +94,7 @@ class RoutineExercise(Model):
 class WorkoutSession(Model):
     """Sesión de entrenamiento: el seguimiento del cliente al ejecutar un día de rutina."""
     id = fields.IntField(pk=True)
+    tenant = fields.ForeignKeyField("models.Tenant", related_name="workout_sessions", null=True, on_delete=fields.SET_NULL)
     client = fields.ForeignKeyField("models.Client", related_name="workout_sessions", on_delete=fields.CASCADE)
     routine = fields.ForeignKeyField("models.Routine", related_name="sessions", null=True, on_delete=fields.SET_NULL)
     day = fields.ForeignKeyField("models.RoutineDay", related_name="sessions", null=True, on_delete=fields.SET_NULL)

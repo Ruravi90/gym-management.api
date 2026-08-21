@@ -5,6 +5,7 @@ from tortoise import fields
 class MentorMessage(Model):
     """Mensajes del mentor IA guardados para historial del cliente."""
     id = fields.IntField(pk=True)
+    tenant = fields.ForeignKeyField("models.Tenant", related_name="mentor_messages", null=True, on_delete=fields.SET_NULL)
     client = fields.ForeignKeyField("models.Client", related_name="mentor_messages", on_delete=fields.CASCADE)
     role = fields.CharField(max_length=20)  # 'mentor' | 'system'
     content = fields.TextField()
