@@ -28,6 +28,8 @@ class SubscriptionResponse(BaseModel):
     trial_ends_at: Optional[datetime] = None
     renews_at: Optional[datetime] = None
     canceled_at: Optional[datetime] = None
+    tenant_name: Optional[str] = None
+    plan_name: Optional[str] = None
 
 
 class SubscriptionAssignRequest(BaseModel):

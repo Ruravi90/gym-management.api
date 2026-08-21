@@ -18,7 +18,11 @@ async def list_plans(current_user=Depends(require_super_admin)):
 
 @router.get("/subscriptions", response_model=List[SubscriptionResponse])
 async def list_subscriptions(current_user=Depends(require_super_admin)):
-    return await Subscription.all().order_by("-updated_at")
+    subscriptions = await Subscription.all().prefetch_related("tenant", "plan").order_by("-updated_at")
+    return [
+        {**subscription.__dict__, "tenant_name": subscription.tenant.name, "plan_name": subscription.plan.name}
+        for subscription in subscriptions
+    ]
 
 
 @router.get("/tenants/{tenant_id}/subscription", response_model=SubscriptionResponse)
