@@ -24,4 +24,7 @@ async def seed_plans() -> None:
         },
     ]
     for plan_data in plans:
-        await Plan.get_or_create(code=plan_data["code"], defaults=plan_data)
+        # `code` es el criterio de búsqueda; no debe repetirse dentro de
+        # `defaults`, porque Tortoise intenta extraerlo dos veces al crear.
+        defaults = {key: value for key, value in plan_data.items() if key != "code"}
+        await Plan.get_or_create(code=plan_data["code"], defaults=defaults)
