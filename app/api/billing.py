@@ -16,6 +16,11 @@ async def list_plans(current_user=Depends(require_super_admin)):
     return await Plan.filter(status="active").order_by("monthly_price")
 
 
+@router.get("/subscriptions", response_model=List[SubscriptionResponse])
+async def list_subscriptions(current_user=Depends(require_super_admin)):
+    return await Subscription.all().order_by("-updated_at")
+
+
 @router.get("/tenants/{tenant_id}/subscription", response_model=SubscriptionResponse)
 async def get_tenant_subscription(tenant_id: int, current_user=Depends(require_super_admin)):
     subscription = await Subscription.filter(tenant_id=tenant_id).prefetch_related("plan").first()
