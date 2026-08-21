@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from app.models.tenant import Tenant
 from app.models.billing import Plan, Subscription, Invoice
-from app.schemas.billing import PlanResponse, PlanUpdateRequest, SubscriptionResponse, SubscriptionAssignRequest, InvoiceResponse, InvoiceCreateRequest
+from app.schemas.billing import PlanResponse, PlanUpdateRequest, SubscriptionResponse, SubscriptionAssignRequest, InvoiceResponse, InvoiceCreateRequest, InvoiceStatusRequest
 from app.utils.tenant import require_super_admin
 from app.services.audit_service import AuditService
 from app.models.audit_log import ActionTypeEnum
@@ -29,6 +29,21 @@ async def create_draft_invoice(tenant_id: int, payload: InvoiceCreateRequest, cu
     number = f"INV-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{tenant_id}"
     invoice = await Invoice.create(tenant_id=tenant_id, subscription_id=subscription.id, number=number, subtotal=subscription.plan.monthly_price, total=subscription.plan.monthly_price, due_at=payload.due_at)
     await AuditService.log_action(ActionTypeEnum.CREATE, current_user.id, "invoice", invoice.id, new_values={"tenant_id": tenant_id, "total": str(invoice.total), "status": invoice.status}, tenant_id=tenant_id)
+    return {**invoice.__dict__, "tenant_name": tenant.name}
+
+
+@router.patch("/invoices/{invoice_id}/status", response_model=InvoiceResponse)
+async def update_invoice_status(invoice_id: int, payload: InvoiceStatusRequest, current_user=Depends(require_super_admin)):
+    invoice = await Invoice.get_or_none(id=invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Factura no encontrada")
+    if payload.status not in ["open", "void"] or invoice.status != "draft":
+        raise HTTPException(status_code=409, detail="Solo una factura en borrador puede abrirse o anularse")
+    previous_status = invoice.status
+    invoice.status = payload.status
+    await invoice.save()
+    await AuditService.log_action(ActionTypeEnum.UPDATE, current_user.id, "invoice", invoice.id, {"status": previous_status}, {"status": invoice.status}, tenant_id=invoice.tenant_id)
+    tenant = await Tenant.get(id=invoice.tenant_id)
     return {**invoice.__dict__, "tenant_name": tenant.name}
 
 

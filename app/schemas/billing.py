@@ -67,3 +67,7 @@ class InvoiceResponse(BaseModel):
 
 class InvoiceCreateRequest(BaseModel):
     due_at: Optional[datetime] = None
+
+
+class InvoiceStatusRequest(BaseModel):
+    status: str
