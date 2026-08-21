@@ -1,6 +1,6 @@
 print("Loading models __init__.py...")
 from .tenant import Tenant, TenantStatus
-from .billing import Plan, PlanStatus, Subscription, SubscriptionStatus
+from .billing import Plan, PlanStatus, Subscription, SubscriptionStatus, Invoice, InvoiceStatus
 from .user import User, UserRoleEnum
 from .client import Client
 from .membership import Membership, MembershipType
@@ -21,6 +21,8 @@ __all__ = [
     "PlanStatus",
     "Subscription",
     "SubscriptionStatus",
+    "Invoice",
+    "InvoiceStatus",
     "User",
     "UserRoleEnum",
     "Client",

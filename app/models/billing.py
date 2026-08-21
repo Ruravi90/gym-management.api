@@ -50,3 +50,33 @@ class Subscription(Model):
     class Meta:
         table = "subscriptions"
         indexes = [("tenant_id",), ("status",)]
+
+
+class InvoiceStatus(str, Enum):
+    DRAFT = "draft"
+    OPEN = "open"
+    PAID = "paid"
+    VOID = "void"
+    UNCOLLECTIBLE = "uncollectible"
+
+
+class Invoice(Model):
+    id = fields.IntField(pk=True)
+    tenant = fields.ForeignKeyField("models.Tenant", related_name="invoices", on_delete=fields.CASCADE)
+    subscription = fields.ForeignKeyField("models.Subscription", related_name="invoices", null=True, on_delete=fields.SET_NULL)
+    number = fields.CharField(max_length=40, unique=True)
+    subtotal = fields.DecimalField(max_digits=10, decimal_places=2, default=0)
+    tax = fields.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total = fields.DecimalField(max_digits=10, decimal_places=2, default=0)
+    currency = fields.CharField(max_length=3, default="MXN")
+    status = fields.CharEnumField(InvoiceStatus, default=InvoiceStatus.DRAFT)
+    due_at = fields.DatetimeField(null=True)
+    paid_at = fields.DatetimeField(null=True)
+    provider = fields.CharField(max_length=40, null=True)
+    provider_invoice_id = fields.CharField(max_length=120, null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "invoices"
+        indexes = [("tenant_id",), ("status",), ("created_at",)]
