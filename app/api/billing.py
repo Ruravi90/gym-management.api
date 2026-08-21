@@ -46,3 +46,23 @@ async def assign_tenant_subscription(tenant_id: int, payload: SubscriptionAssign
         trial_ends_at=now + timedelta(days=plan.trial_days),
         renews_at=now + timedelta(days=plan.trial_days),
     )
+
+
+@router.get("/tenants/{tenant_id}/usage")
+async def get_tenant_usage(tenant_id: int, current_user=Depends(require_super_admin)):
+    tenant = await Tenant.get_or_none(id=tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant no encontrado")
+    subscription = await Subscription.filter(tenant_id=tenant_id).prefetch_related("plan").first()
+    from app.models.user import User
+    from app.models.client import Client
+    users = await User.filter(tenant_id=tenant_id).count()
+    clients = await Client.filter(tenant_id=tenant_id).count()
+    plan = subscription.plan if subscription else None
+    return {
+        "tenant_id": tenant_id,
+        "users": {"used": users, "limit": plan.max_users if plan else tenant.max_users},
+        "clients": {"used": clients, "limit": plan.max_clients if plan else None},
+        "subscription_status": subscription.status if subscription else None,
+        "plan_code": plan.code if plan else None,
+    }
