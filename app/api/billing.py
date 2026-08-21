@@ -72,3 +72,30 @@ async def get_tenant_usage(tenant_id: int, current_user=Depends(require_super_ad
         "subscription_status": subscription.status if subscription else None,
         "plan_code": plan.code if plan else None,
     }
+
+
+@router.post("/tenants/{tenant_id}/subscription/cancel", response_model=SubscriptionResponse)
+async def cancel_tenant_subscription(tenant_id: int, current_user=Depends(require_super_admin)):
+    subscription = await Subscription.filter(tenant_id=tenant_id, status__in=["trialing", "active", "past_due"]).first()
+    if not subscription:
+        raise HTTPException(status_code=404, detail="No existe una suscripción vigente")
+    previous_status = subscription.status
+    subscription.status = "canceled"
+    subscription.canceled_at = datetime.utcnow()
+    await subscription.save()
+    await AuditService.log_action(ActionTypeEnum.UPDATE, current_user.id, "subscription", subscription.id, {"status": previous_status}, {"status": subscription.status, "tenant_id": tenant_id}, tenant_id=tenant_id)
+    return subscription
+
+
+@router.post("/tenants/{tenant_id}/subscription/reactivate", response_model=SubscriptionResponse)
+async def reactivate_tenant_subscription(tenant_id: int, current_user=Depends(require_super_admin)):
+    subscription = await Subscription.filter(tenant_id=tenant_id, status="canceled").first()
+    if not subscription:
+        raise HTTPException(status_code=404, detail="No existe una suscripción cancelada")
+    previous_status = subscription.status
+    subscription.status = "active"
+    subscription.canceled_at = None
+    subscription.renews_at = datetime.utcnow() + timedelta(days=30)
+    await subscription.save()
+    await AuditService.log_action(ActionTypeEnum.UPDATE, current_user.id, "subscription", subscription.id, {"status": previous_status}, {"status": subscription.status, "tenant_id": tenant_id}, tenant_id=tenant_id)
+    return subscription
