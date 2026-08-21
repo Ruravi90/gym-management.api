@@ -18,6 +18,17 @@ class PlanResponse(BaseModel):
     status: str
 
 
+class PlanUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    monthly_price: Optional[Decimal] = None
+    max_users: Optional[int] = None
+    max_clients: Optional[int] = None
+    support_level: Optional[str] = None
+    trial_days: Optional[int] = None
+    status: Optional[str] = None
+
+
 class SubscriptionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int

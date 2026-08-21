@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from app.models.tenant import Tenant
 from app.models.billing import Plan, Subscription
-from app.schemas.billing import PlanResponse, SubscriptionResponse, SubscriptionAssignRequest
+from app.schemas.billing import PlanResponse, PlanUpdateRequest, SubscriptionResponse, SubscriptionAssignRequest
 from app.utils.tenant import require_super_admin
 from app.services.audit_service import AuditService
 from app.models.audit_log import ActionTypeEnum
@@ -19,6 +19,19 @@ async def list_plans(current_user=Depends(require_super_admin)):
         await seed_plans()
         plans = await Plan.filter(status="active").order_by("monthly_price")
     return plans
+
+
+@router.patch("/plans/{plan_id}", response_model=PlanResponse)
+async def update_plan(plan_id: int, payload: PlanUpdateRequest, current_user=Depends(require_super_admin)):
+    plan = await Plan.get_or_none(id=plan_id)
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan no encontrado")
+    old_values = {"monthly_price": str(plan.monthly_price), "max_users": plan.max_users, "max_clients": plan.max_clients, "status": plan.status}
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(plan, field, value)
+    await plan.save()
+    await AuditService.log_action(ActionTypeEnum.UPDATE, current_user.id, "plan", plan.id, old_values=old_values, new_values=payload.model_dump(exclude_unset=True))
+    return plan
 
 
 @router.get("/subscriptions", response_model=List[SubscriptionResponse])
