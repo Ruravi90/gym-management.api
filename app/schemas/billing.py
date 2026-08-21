@@ -45,3 +45,21 @@ class SubscriptionResponse(BaseModel):
 
 class SubscriptionAssignRequest(BaseModel):
     plan_id: int
+
+
+class InvoiceResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    tenant_id: int
+    subscription_id: Optional[int] = None
+    number: str
+    subtotal: Decimal
+    tax: Decimal
+    total: Decimal
+    currency: str
+    status: str
+    due_at: Optional[datetime] = None
+    paid_at: Optional[datetime] = None
+    provider: Optional[str] = None
+    provider_invoice_id: Optional[str] = None
+    tenant_name: Optional[str] = None

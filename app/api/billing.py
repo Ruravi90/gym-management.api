@@ -2,13 +2,19 @@ from typing import List
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from app.models.tenant import Tenant
-from app.models.billing import Plan, Subscription
-from app.schemas.billing import PlanResponse, PlanUpdateRequest, SubscriptionResponse, SubscriptionAssignRequest
+from app.models.billing import Plan, Subscription, Invoice
+from app.schemas.billing import PlanResponse, PlanUpdateRequest, SubscriptionResponse, SubscriptionAssignRequest, InvoiceResponse
 from app.utils.tenant import require_super_admin
 from app.services.audit_service import AuditService
 from app.models.audit_log import ActionTypeEnum
 
 router = APIRouter()
+
+
+@router.get("/invoices", response_model=List[InvoiceResponse])
+async def list_invoices(current_user=Depends(require_super_admin)):
+    invoices = await Invoice.all().prefetch_related("tenant").order_by("-created_at")
+    return [{**invoice.__dict__, "tenant_name": invoice.tenant.name} for invoice in invoices]
 
 
 @router.get("/plans", response_model=List[PlanResponse])
