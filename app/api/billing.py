@@ -13,7 +13,12 @@ router = APIRouter()
 
 @router.get("/plans", response_model=List[PlanResponse])
 async def list_plans(current_user=Depends(require_super_admin)):
-    return await Plan.filter(status="active").order_by("monthly_price")
+    plans = await Plan.filter(status="active").order_by("monthly_price")
+    if not plans:
+        from app.seeders.seed_plans import seed_plans
+        await seed_plans()
+        plans = await Plan.filter(status="active").order_by("monthly_price")
+    return plans
 
 
 @router.get("/subscriptions", response_model=List[SubscriptionResponse])
