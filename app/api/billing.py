@@ -5,6 +5,8 @@ from app.models.tenant import Tenant
 from app.models.billing import Plan, Subscription
 from app.schemas.billing import PlanResponse, SubscriptionResponse, SubscriptionAssignRequest
 from app.utils.tenant import require_super_admin
+from app.services.audit_service import AuditService
+from app.models.audit_log import ActionTypeEnum
 
 router = APIRouter()
 
@@ -33,19 +35,23 @@ async def assign_tenant_subscription(tenant_id: int, payload: SubscriptionAssign
     current = await Subscription.filter(tenant_id=tenant_id, status__in=["trialing", "active", "past_due"]).first()
     now = datetime.utcnow()
     if current:
+        previous_plan_id = current.plan_id
         current.plan_id = plan.id
         current.status = "active"
         current.renews_at = now + timedelta(days=30)
         await current.save()
+        await AuditService.log_action(ActionTypeEnum.UPDATE, current_user.id, "subscription", current.id, {"tenant_id": tenant_id, "plan_id": previous_plan_id}, {"tenant_id": tenant_id, "plan_id": plan.id, "status": current.status}, tenant_id=tenant_id)
         return current
 
-    return await Subscription.create(
+    subscription = await Subscription.create(
         tenant_id=tenant_id,
         plan_id=plan.id,
         status="trialing",
         trial_ends_at=now + timedelta(days=plan.trial_days),
         renews_at=now + timedelta(days=plan.trial_days),
     )
+    await AuditService.log_action(ActionTypeEnum.CREATE, current_user.id, "subscription", subscription.id, new_values={"tenant_id": tenant_id, "plan_id": plan.id, "status": subscription.status}, tenant_id=tenant_id)
+    return subscription
 
 
 @router.get("/tenants/{tenant_id}/usage")
