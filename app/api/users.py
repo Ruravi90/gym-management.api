@@ -5,6 +5,7 @@ from app.utils.auth import get_current_user
 
 
 from app.models.user import User as UserModel
+from app.services.billing_limits import ensure_within_limit
 
 router = APIRouter()
 
@@ -23,6 +24,7 @@ async def create_user(user: schemas.UserCreate, current_user: UserModel = Depend
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permisos para crear un Super Admin")
 
     tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    await ensure_within_limit(tenant_id, "users")
 
     db_user = await crud.user.get_user_by_email(email=user.email)
     if db_user:

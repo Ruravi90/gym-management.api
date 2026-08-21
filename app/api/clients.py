@@ -7,6 +7,7 @@ from app.utils.auth import get_current_user
 from app.models.user import User as UserModel
 
 from app.utils.logging import logger
+from app.services.billing_limits import ensure_within_limit
 
 router = APIRouter()
 
@@ -21,6 +22,7 @@ def get_face_service() -> FacialRecognitionService:
 @router.post("", response_model=schemas.Client)
 async def create_client(client: schemas.ClientCreate, current_user: UserModel = Depends(get_current_user)):
     tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
+    await ensure_within_limit(tenant_id, "clients")
 
     if client.email:
         db_client = await crud.client.get_client_by_email(email=client.email, tenant_id=tenant_id)
