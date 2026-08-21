@@ -28,3 +28,7 @@ class SubscriptionResponse(BaseModel):
     trial_ends_at: Optional[datetime] = None
     renews_at: Optional[datetime] = None
     canceled_at: Optional[datetime] = None
+
+
+class SubscriptionAssignRequest(BaseModel):
+    plan_id: int

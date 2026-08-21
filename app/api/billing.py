@@ -1,7 +1,9 @@
 from typing import List
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
+from app.models.tenant import Tenant
 from app.models.billing import Plan, Subscription
-from app.schemas.billing import PlanResponse, SubscriptionResponse
+from app.schemas.billing import PlanResponse, SubscriptionResponse, SubscriptionAssignRequest
 from app.utils.tenant import require_super_admin
 
 router = APIRouter()
@@ -18,3 +20,29 @@ async def get_tenant_subscription(tenant_id: int, current_user=Depends(require_s
     if not subscription:
         raise HTTPException(status_code=404, detail="El tenant no tiene suscripción")
     return subscription
+
+
+@router.put("/tenants/{tenant_id}/subscription", response_model=SubscriptionResponse)
+async def assign_tenant_subscription(tenant_id: int, payload: SubscriptionAssignRequest, current_user=Depends(require_super_admin)):
+    if not await Tenant.exists(id=tenant_id):
+        raise HTTPException(status_code=404, detail="Tenant no encontrado")
+    plan = await Plan.get_or_none(id=payload.plan_id, status="active")
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan activo no encontrado")
+
+    current = await Subscription.filter(tenant_id=tenant_id, status__in=["trialing", "active", "past_due"]).first()
+    now = datetime.utcnow()
+    if current:
+        current.plan_id = plan.id
+        current.status = "active"
+        current.renews_at = now + timedelta(days=30)
+        await current.save()
+        return current
+
+    return await Subscription.create(
+        tenant_id=tenant_id,
+        plan_id=plan.id,
+        status="trialing",
+        trial_ends_at=now + timedelta(days=plan.trial_days),
+        renews_at=now + timedelta(days=plan.trial_days),
+    )
