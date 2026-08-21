@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from app.models.tenant import Tenant
 from app.models.billing import Plan, Subscription, Invoice
-from app.schemas.billing import PlanResponse, PlanUpdateRequest, SubscriptionResponse, SubscriptionAssignRequest, InvoiceResponse
+from app.schemas.billing import PlanResponse, PlanUpdateRequest, SubscriptionResponse, SubscriptionAssignRequest, InvoiceResponse, InvoiceCreateRequest
 from app.utils.tenant import require_super_admin
 from app.services.audit_service import AuditService
 from app.models.audit_log import ActionTypeEnum
@@ -15,6 +15,21 @@ router = APIRouter()
 async def list_invoices(current_user=Depends(require_super_admin)):
     invoices = await Invoice.all().prefetch_related("tenant").order_by("-created_at")
     return [{**invoice.__dict__, "tenant_name": invoice.tenant.name} for invoice in invoices]
+
+
+@router.post("/tenants/{tenant_id}/invoices", response_model=InvoiceResponse)
+async def create_draft_invoice(tenant_id: int, payload: InvoiceCreateRequest, current_user=Depends(require_super_admin)):
+    tenant = await Tenant.get_or_none(id=tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant no encontrado")
+    subscription = await Subscription.filter(tenant_id=tenant_id, status__in=["trialing", "active"]).prefetch_related("plan").first()
+    if not subscription:
+        raise HTTPException(status_code=409, detail="El tenant no tiene una suscripción vigente")
+    from datetime import datetime
+    number = f"INV-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{tenant_id}"
+    invoice = await Invoice.create(tenant_id=tenant_id, subscription_id=subscription.id, number=number, subtotal=subscription.plan.monthly_price, total=subscription.plan.monthly_price, due_at=payload.due_at)
+    await AuditService.log_action(ActionTypeEnum.CREATE, current_user.id, "invoice", invoice.id, new_values={"tenant_id": tenant_id, "total": str(invoice.total), "status": invoice.status}, tenant_id=tenant_id)
+    return {**invoice.__dict__, "tenant_name": tenant.name}
 
 
 @router.get("/plans", response_model=List[PlanResponse])

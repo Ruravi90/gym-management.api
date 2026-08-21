@@ -7,7 +7,7 @@ from .gym_class import GymClass, GymClassCreate, GymClassUpdate
 from .auth import UserLogin, Token, TokenData, UserRegister
 from .audit_log import AuditLog, AuditLogCreate, AuditLogUpdate, ActionTypeEnum
 from .tenant import TenantCreate, TenantUpdate, TenantResponse, TenantStats
-from .billing import PlanResponse, PlanUpdateRequest, SubscriptionResponse, SubscriptionAssignRequest, InvoiceResponse
+from .billing import PlanResponse, PlanUpdateRequest, SubscriptionResponse, SubscriptionAssignRequest, InvoiceResponse, InvoiceCreateRequest
 from . import kaizen as kaizen
 from . import routine as routine
 from . import measurement as measurement
@@ -51,4 +51,5 @@ __all__ = [
     "SubscriptionResponse",
     "SubscriptionAssignRequest",
     "InvoiceResponse",
+    "InvoiceCreateRequest",
 ]

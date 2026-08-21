@@ -63,3 +63,7 @@ class InvoiceResponse(BaseModel):
     provider: Optional[str] = None
     provider_invoice_id: Optional[str] = None
     tenant_name: Optional[str] = None
+
+
+class InvoiceCreateRequest(BaseModel):
+    due_at: Optional[datetime] = None
