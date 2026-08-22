@@ -5,7 +5,7 @@ from datetime import datetime
 
 class TenantCreate(BaseModel):
     name: str
-    slug: str
+    slug: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None

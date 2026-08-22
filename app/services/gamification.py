@@ -182,11 +182,16 @@ class GamificationService:
 
         result = []
         for defn in definitions:
-            is_earned = defn.key in earned_map
-            earned_date = (
-                earned_map[defn.key].earned_date if is_earned else None
-            )
             progress = self._get_progress_for_criteria(defn, stats, client)
+            # El progreso es la fuente de verdad para la UI. Si el logro ya
+            # alcanzó su meta pero por alguna razón no existe todavía el
+            # registro histórico, no debe mostrarse como bloqueado.
+            is_earned = defn.key in earned_map or progress >= defn.criteria_value
+            earned_date = (
+                earned_map[defn.key].earned_date
+                if defn.key in earned_map
+                else None
+            )
 
             result.append(
                 {

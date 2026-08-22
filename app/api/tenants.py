@@ -1,11 +1,30 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List, Optional
+import re
+import unicodedata
 from app.schemas.tenant import TenantCreate, TenantUpdate, TenantResponse, TenantStats
 from app.crud import tenant as tenant_crud
 from app.utils.tenant import require_super_admin
 from app.models.user import User as UserModel
 
 router = APIRouter()
+
+
+def _slug_base(name: str) -> str:
+    normalized = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    slug = re.sub(r"[^a-z0-9]+", "-", normalized.lower()).strip("-")
+    return (slug or "gimnasio")[:50].rstrip("-")
+
+
+async def _unique_slug(name: str) -> str:
+    base = _slug_base(name)
+    candidate = base
+    suffix = 2
+    while await tenant_crud.get_tenant_by_slug(candidate):
+        suffix_text = f"-{suffix}"
+        candidate = f"{base[:50 - len(suffix_text)]}{suffix_text}"
+        suffix += 1
+    return candidate
 
 
 @router.get("", response_model=List[TenantResponse])
@@ -30,10 +49,9 @@ async def create_tenant(
     tenant_in: TenantCreate,
     current_user: UserModel = Depends(require_super_admin),
 ):
-    existing = await tenant_crud.get_tenant_by_slug(tenant_in.slug)
-    if existing:
-        raise HTTPException(status_code=400, detail="El slug ya está en uso")
-    return await tenant_crud.create_tenant(tenant_in.model_dump())
+    data = tenant_in.model_dump()
+    data["slug"] = await _unique_slug(tenant_in.name)
+    return await tenant_crud.create_tenant(data)
 
 
 @router.get("/{tenant_id}", response_model=TenantResponse)
