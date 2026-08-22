@@ -39,7 +39,9 @@ async def read_users(skip: int = 0, limit: int = 100, current_user: UserModel = 
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
     tenant_id = None if current_user.role == "super_admin" else current_user.tenant_id
     users = await crud.user.get_users(skip=skip, limit=limit, tenant_id=tenant_id)
-    return users
+    # Los Super Admin pertenecen al Centro de Control SaaS y no deben
+    # aparecer en la administración de usuarios de los gimnasios.
+    return [user for user in users if user.role != "super_admin"]
 
 @router.get('/me', response_model=schemas.User)
 def read_current_user(current_user: UserModel = Depends(get_current_user)):
