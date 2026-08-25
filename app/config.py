@@ -48,6 +48,25 @@ class Settings(BaseSettings):
 
     # Redis for real-time check-in notifications
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")
+    WAHA_BASE_URL: str = os.getenv("WAHA_BASE_URL", "")
+    WAHA_API_KEY: str = os.getenv("WAHA_API_KEY", "")
+    # Cuando WAHA_API_KEY usa sha512:..., el cliente debe enviar la clave plana.
+    WAHA_API_KEY_PLAIN: str = os.getenv("WAHA_API_KEY_PLAIN", "")
+    WAHA_MASTER_SESSION: str = os.getenv("WAHA_MASTER_SESSION", os.getenv("WAHA_SYSTEM_INSTANCE", "default"))
+    WAHA_SYSTEM_INSTANCE: str = os.getenv("WAHA_SYSTEM_INSTANCE", "")
+    WAHA_ENABLED: bool = os.getenv("WAHA_ENABLED", "false").lower() == "true"
+    WAHA_SYSTEM_ENABLED: bool = os.getenv("WAHA_SYSTEM_ENABLED", "false").lower() == "true"
+    WAHA_CONNECT_TIMEOUT: float = float(os.getenv("WAHA_CONNECT_TIMEOUT", "5"))
+    WAHA_TIMEOUT: float = float(os.getenv("WAHA_TIMEOUT", "20"))
+    WAHA_TIMEOUT_SECONDS: float = float(os.getenv("WAHA_TIMEOUT_SECONDS", os.getenv("WAHA_TIMEOUT", "10")))
+    WAHA_MESSAGE_DELAY: float = float(os.getenv("WAHA_MESSAGE_DELAY", "0"))
+    WAHA_WEBHOOK_URL: str = os.getenv("WAHA_WEBHOOK_URL", "")
+    WAHA_WEBHOOK_SECRET: str = os.getenv("WAHA_WEBHOOK_SECRET", "")
+    MEMBER_PORTAL_URL: str = os.getenv("MEMBER_PORTAL_URL", "")
+    PORTAL_URL: str = os.getenv(
+        "PORTAL_URL",
+        MEMBER_PORTAL_URL or (os.getenv("FRONTEND_URL", "") if os.getenv("FRONTEND_URL", "") != "*" else ""),
+    ).rstrip("/")
 
 settings = Settings()
 

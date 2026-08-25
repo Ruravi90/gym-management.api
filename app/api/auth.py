@@ -7,6 +7,7 @@ from app.utils.auth import (
     authenticate_user, create_access_token, create_refresh_token,
     verify_refresh_token, get_current_user,
     set_auth_cookies, clear_auth_cookies, REFRESH_TOKEN_COOKIE,
+    verify_password_setup_token,
 )
 from app.config import settings
 from app.middleware.security import limiter, auth_limits
@@ -14,11 +15,102 @@ from app.services.qr_service import generate_qr_token
 from app.services.pin_service import generate_pin
 from app.services.checkin_notifier import subscribe_checkin, notify_checkin
 from app.models.user import User
+from tortoise.transactions import in_transaction
+from tortoise.expressions import Q
+from secrets import token_urlsafe
+import hashlib
 
 logger = logging.getLogger(__name__)
 
 
 router = APIRouter()
+
+COMMON_PASSWORDS = {"123456", "password", "12345678", "qwerty", "123456789", "111111", "abc123", "123123", "admin123", "contraseña", "password1"}
+
+def validate_new_password(password: object) -> str | None:
+    if not isinstance(password, str) or len(password) < 6:
+        return "La contraseña debe tener al menos 6 caracteres"
+    normalized = password.strip().lower()
+    if normalized in COMMON_PASSWORDS:
+        return "Elige una contraseña menos común"
+    if len(set(normalized)) == 1 or normalized in "0123456789abcdefghijklmnopqrstuvwxyz":
+        return "Elige una contraseña menos predecible"
+    return None
+
+async def _forgot_password(payload: dict, audience: str):
+    identifier = str(payload.get("identifier", "")).strip()
+    generic = {"message": "Si la cuenta existe y tiene teléfono, recibirás un enlace por WhatsApp."}
+    if not identifier:
+        return generic
+    user = None
+    if audience == "member":
+        from app.models.client import Client
+        digits = "".join(ch for ch in identifier if ch.isdigit())
+        phone_values = [identifier, digits, f"+52{digits}", f"52{digits}"] if len(digits) == 10 else [identifier]
+        client_matches = await Client.filter(Q(email=identifier.lower()) | Q(phone__in=phone_values)).filter(status=True).prefetch_related("user")
+        users = [client.user for client in client_matches if client.user and client.user.status]
+        user = users[0] if len({item.id for item in users}) == 1 else None
+    else:
+        user = await User.get_or_none(email=identifier.lower())
+    if not user and audience == "admin":
+        digits = "".join(ch for ch in identifier if ch.isdigit())
+        if len(digits) == 10:
+            phone_matches = await User.filter(phone__in=[digits, f"+52{digits}", f"52{digits}"]).all()
+            # No enviar a una cuenta arbitraria si el teléfono todavía está duplicado.
+            candidates = [item for item in phone_matches if item.status and item.role in ("admin", "manager", "receptionist", "super_admin")]
+            user = candidates[0] if len(candidates) == 1 else None
+    if not user or not user.status or not user.phone or not settings.PORTAL_URL or not settings.PORTAL_URL.startswith(("http://", "https://")):
+        return generic
+    raw_token = token_urlsafe(32)
+    user.password_reset_token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+    user.password_reset_expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=20)
+    await user.save(update_fields=["password_reset_token_hash", "password_reset_expires_at", "updated_at"])
+    from app.services.waha import send_text
+    link = f"{settings.PORTAL_URL.rstrip('/')}/activar-cuenta?reset={raw_token}"
+    await send_text(user.phone, f"Recibimos una solicitud para cambiar tu contraseña de MyGym. Usa este enlace (válido 20 minutos): {link}", settings.WAHA_MASTER_SESSION)
+    return generic
+
+@router.post("/member/forgot-password")
+async def member_forgot_password(payload: dict):
+    return await _forgot_password(payload, "member")
+
+@router.post("/admin/forgot-password")
+async def admin_forgot_password(payload: dict):
+    return await _forgot_password(payload, "admin")
+
+@router.post("/set-password")
+async def set_password(payload: dict):
+    password = payload.get("password", "")
+    password_error = validate_new_password(password)
+    if password_error:
+        raise HTTPException(status_code=400, detail=password_error)
+    reset_token = payload.get("reset") or payload.get("reset_token")
+    if reset_token:
+        token_hash = hashlib.sha256(str(reset_token).encode()).hexdigest()
+        async with in_transaction() as connection:
+            user = await User.filter(password_reset_token_hash=token_hash).using_db(connection).select_for_update().first()
+            if not user or not user.status or not user.password_reset_expires_at or user.password_reset_expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
+                raise HTTPException(status_code=410, detail="El enlace de recuperación es inválido o expiró")
+            user.hashed_password = __import__("app.utils.auth", fromlist=["hash_password"]).hash_password(password)
+            user.password_reset_token_hash = None
+            user.password_reset_expires_at = None
+            await user.save(using_db=connection, update_fields=["hashed_password", "password_reset_token_hash", "password_reset_expires_at", "updated_at"])
+        return {"message": "Contraseña actualizada correctamente"}
+    user_id = verify_password_setup_token(payload.get("token", ""))
+    if not user_id:
+        raise HTTPException(status_code=400, detail="Enlace inválido o contraseña demasiado corta")
+    from app.utils.auth import hash_password
+    from datetime import datetime, timezone
+    async with in_transaction() as connection:
+        user = await User.filter(id=user_id).using_db(connection).select_for_update().first()
+        if not user or not user.status:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado o inactivo")
+        if user.password_setup_at is not None:
+            raise HTTPException(status_code=410, detail="Este enlace de activación ya fue utilizado")
+        user.hashed_password = hash_password(password)
+        user.password_setup_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        await user.save(using_db=connection, update_fields=["hashed_password", "password_setup_at", "updated_at"])
+    return {"message": "Contraseña configurada correctamente"}
 
 @router.post("/login")
 @limiter.limit(auth_limits)

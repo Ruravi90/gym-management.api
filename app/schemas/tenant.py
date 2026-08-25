@@ -11,6 +11,8 @@ class TenantCreate(BaseModel):
     address: Optional[str] = None
     logo_url: Optional[str] = None
     max_users: int = 10
+    waha_session: Optional[str] = None
+    waha_enabled: bool = False
 
 
 class TenantUpdate(BaseModel):
@@ -21,6 +23,8 @@ class TenantUpdate(BaseModel):
     logo_url: Optional[str] = None
     status: Optional[str] = None
     max_users: Optional[int] = None
+    waha_session: Optional[str] = None
+    waha_enabled: Optional[bool] = None
 
 
 class TenantResponse(BaseModel):
@@ -35,6 +39,8 @@ class TenantResponse(BaseModel):
     max_users: int
     created_at: datetime
     updated_at: datetime
+    waha_session: Optional[str] = None
+    waha_enabled: bool = False
 
     class Config:
         from_attributes = True

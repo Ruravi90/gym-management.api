@@ -19,6 +19,8 @@ class Tenant(Model):
     logo_url = fields.CharField(max_length=500, null=True)
     status = fields.CharEnumField(TenantStatus, default=TenantStatus.ACTIVE)
     max_users = fields.IntField(default=10)
+    waha_session = fields.CharField(max_length=100, null=True)
+    waha_enabled = fields.BooleanField(default=False)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 

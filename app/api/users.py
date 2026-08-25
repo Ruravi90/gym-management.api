@@ -6,6 +6,10 @@ from app.utils.auth import get_current_user
 
 from app.models.user import User as UserModel
 from app.services.billing_limits import ensure_within_limit
+from app.services.waha import send_text
+from app.config import settings
+from app.utils.auth import create_password_setup_token
+from app.models.tenant import Tenant
 
 router = APIRouter()
 
@@ -29,7 +33,13 @@ async def create_user(user: schemas.UserCreate, current_user: UserModel = Depend
     db_user = await crud.user.get_user_by_email(email=user.email)
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
-    return await crud.user.create_user(user_data=user.dict(), tenant_id=tenant_id)
+    db_user = await crud.user.create_user(user_data=user.dict(), tenant_id=tenant_id)
+    if db_user.phone and settings.PORTAL_URL:
+        tenant = await Tenant.get_or_none(id=tenant_id) if tenant_id else None
+        setup_url = f"{settings.PORTAL_URL.rstrip('/')}/activar-cuenta?token={create_password_setup_token(db_user.id)}"
+        tenant_name = tenant.name if tenant else "MyGym"
+        await send_text(db_user.phone, f"¡Bienvenido a {tenant_name}, {db_user.name}! Tu acceso al portal de socios ya está listo. Crea tu contraseña aquí: {setup_url}", settings.WAHA_MASTER_SESSION)
+    return db_user
 
 
 @router.get("", response_model=List[schemas.User])

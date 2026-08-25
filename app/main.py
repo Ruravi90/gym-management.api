@@ -23,6 +23,7 @@ from app.api.routines import router as routines_router
 from app.api.mentor import router as mentor_router
 from app.api.measurements import router as measurements_router
 from app.api.tenants import router as tenants_router
+from app.api.webhooks import router as webhooks_router
 from app.api.billing import router as billing_router
 from app.middleware.security import add_security_middleware, limiter, common_limits, auth_limits, file_upload_limits
 from app.services.checkin_notifier import init_redis, close_redis
@@ -95,6 +96,7 @@ logger.info("Including measurements router...")
 app.include_router(measurements_router, prefix="/measurements", tags=["measurements"])
 logger.info("Including tenants router...")
 app.include_router(tenants_router, prefix="/tenants", tags=["tenants"])
+app.include_router(webhooks_router, prefix="/webhooks", tags=["webhooks"])
 app.include_router(billing_router, prefix="/billing", tags=["billing"])
 logger.info("All routers included successfully")
 
@@ -181,6 +183,11 @@ async def startup_event():
                 logger.info(f"✅ Added {column} to {table}")
             except: pass
 
+        for column, col_type in [("waha_session", "VARCHAR(100) NULL"), ("waha_enabled", "BOOLEAN NOT NULL DEFAULT FALSE")]:
+            try:
+                await conn.execute_query(f"ALTER TABLE `tenants` ADD COLUMN `{column}` {col_type}")
+            except: pass
+
         try:
             await conn.execute_query("ALTER TABLE `kaizen_habits` ADD COLUMN `reflection` LONGTEXT")
             logger.info("✅ Added reflection to kaizen_habits")
@@ -217,6 +224,15 @@ async def startup_event():
             await conn.execute_query("ALTER TABLE `users` ADD COLUMN `injuries` LONGTEXT")
             logger.info("✅ Added injuries to users")
         except: pass
+        try:
+            await conn.execute_query("ALTER TABLE `users` ADD COLUMN `password_setup_at` DATETIME NULL")
+            logger.info("✅ Added password_setup_at to users")
+        except: pass
+        for column, col_type in [("password_reset_token_hash", "VARCHAR(128) NULL"), ("password_reset_expires_at", "DATETIME NULL")]:
+            try:
+                await conn.execute_query(f"ALTER TABLE `users` ADD COLUMN `{column}` {col_type}")
+                logger.info(f"✅ Added {column} to users")
+            except: pass
 
         # Client report rate-limit columns
         try:

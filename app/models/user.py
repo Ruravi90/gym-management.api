@@ -30,6 +30,9 @@ class User(Model):
     injuries = fields.TextField(null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
+    password_setup_at = fields.DatetimeField(null=True)
+    password_reset_token_hash = fields.CharField(max_length=128, null=True)
+    password_reset_expires_at = fields.DatetimeField(null=True)
     
     class Meta:
         table = "users"

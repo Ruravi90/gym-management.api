@@ -2,12 +2,41 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List, Optional
 import re
 import unicodedata
+import re
 from app.schemas.tenant import TenantCreate, TenantUpdate, TenantResponse, TenantStats
 from app.crud import tenant as tenant_crud
 from app.utils.tenant import require_super_admin
 from app.models.user import User as UserModel
+from app.config import settings
+from app.services.waha import send_text, send_text_result
 
 router = APIRouter()
+
+@router.get("/waha/status")
+async def waha_status(current_user: UserModel = Depends(require_super_admin)):
+    """Estado seguro de la sesión master; nunca expone la API key."""
+    configured = bool(settings.WAHA_BASE_URL and settings.WAHA_MASTER_SESSION)
+    return {
+        "configured": configured,
+        "active": configured,
+        "session": settings.WAHA_MASTER_SESSION if configured else None,
+        "base_url": settings.WAHA_BASE_URL if configured else None,
+    }
+
+@router.post("/waha/test-message")
+async def waha_test_message(payload: dict, current_user: UserModel = Depends(require_super_admin)):
+    phone = str(payload.get("phone", "")).strip()
+    message = str(payload.get("message", "")).strip()
+    if not re.fullmatch(r"[0-9]{10}", phone):
+        raise HTTPException(status_code=400, detail="El teléfono debe contener exactamente 10 dígitos de México")
+    if not message or len(message) > 500:
+        raise HTTPException(status_code=400, detail="El mensaje es obligatorio y debe tener máximo 500 caracteres")
+    if not settings.WAHA_ENABLED:
+        raise HTTPException(status_code=503, detail="WAHA está deshabilitado en la configuración")
+    sent, detail = await send_text_result(f"+52{phone}", message, settings.WAHA_MASTER_SESSION)
+    if not sent:
+        raise HTTPException(status_code=502, detail=detail or "WAHA no aceptó el envío del mensaje")
+    return {"message": "Mensaje enviado correctamente", "phone": f"+52{phone}"}
 
 
 def _slug_base(name: str) -> str:

@@ -33,6 +33,18 @@ from fastapi.security import OAuth2PasswordBearer
 from app.config import settings
 from app.models.user import User
 
+def create_password_setup_token(user_id: int) -> str:
+    return jwt.encode({"sub": str(user_id), "purpose": "password_setup", "exp": datetime.now(timezone.utc) + timedelta(hours=24)}, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+def verify_password_setup_token(token: str) -> Optional[int]:
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("purpose") != "password_setup":
+            return None
+        return int(payload["sub"])
+    except (JWTError, KeyError, TypeError, ValueError):
+        return None
+
 ACCESS_TOKEN_COOKIE = "access_token"
 REFRESH_TOKEN_COOKIE = "refresh_token"
 
