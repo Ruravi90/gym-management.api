@@ -67,8 +67,18 @@ class Settings(BaseSettings):
         "PORTAL_URL",
         MEMBER_PORTAL_URL or (os.getenv("FRONTEND_URL", "") if os.getenv("FRONTEND_URL", "") != "*" else ""),
     ).rstrip("/")
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER: str = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_FROM: str = os.getenv("SMTP_FROM", "")
+    SMTP_TLS: bool = os.getenv("SMTP_TLS", "true").lower() == "true"
 
 settings = Settings()
+
+# El portal de miembros local se sirve sin TLS por Angular CLI.
+if settings.PORTAL_URL.startswith(("https://localhost", "https://127.0.0.1")):
+    settings.PORTAL_URL = "http://" + settings.PORTAL_URL.split("://", 1)[1]
 
 # Fail-safe: en producción la SECRET_KEY debe ser un valor real (no el placeholder ni vacía),
 # porque se usa para firmar los JWT. En desarrollo solo se advierte.

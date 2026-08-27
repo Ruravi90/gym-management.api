@@ -9,12 +9,17 @@ logger = logging.getLogger(__name__)
 
 
 def normalize_phone(phone: str) -> str:
-    digits = "".join(ch for ch in (phone or "") if ch.isdigit())
+    digits = phone_digits(phone)
     return f"{digits}@c.us"
 
 
 def phone_digits(phone: str) -> str:
-    return "".join(ch for ch in (phone or "") if ch.isdigit())
+    digits = "".join(ch for ch in (phone or "") if ch.isdigit())
+    if len(digits) == 10:
+        return f"52{digits}"
+    if digits.startswith("052"):
+        return digits[1:]
+    return digits
 
 
 async def send_text_result(phone: Optional[str], text: str, session: Optional[str] = None) -> tuple[bool, str]:

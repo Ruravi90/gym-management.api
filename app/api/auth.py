@@ -39,7 +39,7 @@ def validate_new_password(password: object) -> str | None:
 
 async def _forgot_password(payload: dict, audience: str):
     identifier = str(payload.get("identifier", "")).strip()
-    generic = {"message": "Si la cuenta existe y tiene teléfono, recibirás un enlace por WhatsApp."}
+    generic = {"message": "Si la cuenta existe, se intentará enviar un enlace por correo electrónico y WhatsApp."}
     if not identifier:
         return generic
     user = None
@@ -59,15 +59,34 @@ async def _forgot_password(payload: dict, audience: str):
             # No enviar a una cuenta arbitraria si el teléfono todavía está duplicado.
             candidates = [item for item in phone_matches if item.status and item.role in ("admin", "manager", "receptionist", "super_admin")]
             user = candidates[0] if len(candidates) == 1 else None
-    if not user or not user.status or not user.phone or not settings.PORTAL_URL or not settings.PORTAL_URL.startswith(("http://", "https://")):
+    if not user or not user.status or not (user.email or user.phone) or not settings.PORTAL_URL or not settings.PORTAL_URL.startswith(("http://", "https://")):
         return generic
     raw_token = token_urlsafe(32)
     user.password_reset_token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
     user.password_reset_expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=20)
     await user.save(update_fields=["password_reset_token_hash", "password_reset_expires_at", "updated_at"])
-    from app.services.waha import send_text
-    link = f"{settings.PORTAL_URL.rstrip('/')}/activar-cuenta?reset={raw_token}"
-    await send_text(user.phone, f"Recibimos una solicitud para cambiar tu contraseña de MyGym. Usa este enlace (válido 20 minutos): {link}", settings.WAHA_MASTER_SESSION)
+    portal_url = settings.MEMBER_PORTAL_URL if audience == "member" and settings.MEMBER_PORTAL_URL else settings.PORTAL_URL
+    link = f"{portal_url.rstrip('/')}/activar-cuenta?reset={raw_token}"
+    from app.services.email import send_password_reset_email
+    sent_by_email = await send_password_reset_email(user.email, user.name, link)
+    sent_by_whatsapp = False
+    if user.phone:
+        from app.services.waha import send_text_result
+        try:
+            sent_by_whatsapp, whatsapp_detail = await send_text_result(
+                user.phone,
+                f"🔐 *Restablecimiento de contraseña — MyGym*\n\n"
+                f"Recibimos una solicitud para cambiar tu contraseña.\n\n"
+                f"👉 *Cambia tu contraseña aquí:*\n{link}\n\n"
+                f"⏱️ Este enlace es válido durante *20 minutos*.\n\n"
+                f"Si no solicitaste este cambio, puedes ignorar este mensaje.",
+                settings.WAHA_MASTER_SESSION,
+            )
+            if not sent_by_whatsapp:
+                logger.warning("WAHA no envió el enlace de recuperación al usuario %s: %s", user.id, whatsapp_detail)
+        except Exception:
+            logger.exception("No se pudo enviar WhatsApp de recuperación a %s", user.phone)
+    logger.info("Recuperación solicitada para %s: email=%s whatsapp=%s", user.id, sent_by_email, sent_by_whatsapp)
     return generic
 
 @router.post("/member/forgot-password")
