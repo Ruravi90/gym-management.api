@@ -5,17 +5,44 @@ from app.utils.security import AuthenticatedUser, ReceptionistOrAbove
 
 router = APIRouter()
 
+TRAINING_TYPES = {"gym", "calisthenics", "crossfit"}
+DIFFICULTIES = {"beginner", "intermediate", "advanced"}
+
+
+@router.get("/options")
+async def exercise_options(current_user = AuthenticatedUser):
+    """Opciones oficiales para construir filtros en cualquier cliente."""
+    return {
+        "training_types": [
+            {"value": "gym", "label": "Gimnasio"},
+            {"value": "calisthenics", "label": "Calistenia"},
+            {"value": "crossfit", "label": "CrossFit"},
+        ],
+        "difficulties": [
+            {"value": "beginner", "label": "Principiante"},
+            {"value": "intermediate", "label": "Intermedio"},
+            {"value": "advanced", "label": "Avanzado"},
+        ],
+    }
+
 
 @router.get("", response_model=List[schemas.routine.ExerciseResponse])
 async def list_exercises(
     search: Optional[str] = Query(None, description="Buscar por nombre"),
     muscle_group: Optional[str] = Query(None, description="Grupo muscular (chest, back, shoulders...)"),
     equipment: Optional[str] = Query(None, description="Equipamiento (barbell, dumbbell, body weight...)"),
+    training_type: Optional[str] = Query(None, description="Modalidad (gym, calisthenics, crossfit)"),
+    difficulty: Optional[str] = Query(None, description="Nivel (beginner, intermediate, advanced)"),
     current_user = AuthenticatedUser,
 ):
     """Lista el catálogo de ejercicios (público para usuarios autenticados)."""
+    if training_type and training_type not in TRAINING_TYPES:
+        raise HTTPException(status_code=400, detail="Modalidad inválida")
+    if difficulty and difficulty not in DIFFICULTIES:
+        raise HTTPException(status_code=400, detail="Dificultad inválida")
     return await crud.routine.list_exercises(
-        search=search, muscle_group=muscle_group, equipment=equipment
+        search=search, muscle_group=muscle_group, equipment=equipment, training_type=training_type,
+        difficulty=difficulty
     )
 
 

@@ -123,6 +123,7 @@ async def startup_event():
 
     await init_redis()
 
+
     with seeder_lock:
         if seeders_executed:
             return
@@ -130,13 +131,25 @@ async def startup_event():
     
     logger.info("✅ Database schema initialized at startup via Tortoise ORM")
 
-    # Run migrations using Aerich
-    try:
-        from tortoise import Tortoise
-        conn = Tortoise.get_connection("default")
-        
-        # Manual emergency fix for missing columns
-        logger.info("🛠️  Checking/Applying manual column fixes...")
+    """Schema changes are applied before startup by Aerich (entrypoint/F5).
+
+    Do not run DDL from the application process: startup must be safe to repeat.
+    """
+    '''
+
+        # Exercise modality (kept idempotent for existing installations).
+        try:
+            await conn.execute_query(
+                "ALTER TABLE `exercises` ADD COLUMN `training_type` VARCHAR(20) NOT NULL DEFAULT 'gym'"
+            )
+            logger.info("✅ Added exercises.training_type")
+        except Exception:
+            pass
+        try:
+            await conn.execute_query("ALTER TABLE `exercises` ADD COLUMN `video_url` VARCHAR(500) NULL")
+            logger.info("✅ Added exercises.video_url")
+        except Exception:
+            pass
 
         # Tenant table
         try:
@@ -235,6 +248,7 @@ async def startup_event():
             except: pass
 
         # Client report rate-limit columns
+        # Client report rate-limit columns
         try:
             await conn.execute_query("ALTER TABLE `clients` ADD COLUMN `last_weekly_checkin_at` DATETIME NULL")
             logger.info("✅ Added last_weekly_checkin_at to clients")
@@ -324,6 +338,7 @@ async def startup_event():
             logger.warning(f"⚠️  Migrations not applied (schema may already be up to date): {e}")
     except Exception as e:
         logger.error(f"❌ Error during migration setup: {str(e)}")
+    '''
 
     # Import and run seeders after database initialization
     try:

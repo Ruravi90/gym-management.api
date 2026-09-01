@@ -5,6 +5,14 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "api:migrate",
+      "type": "shell",
+      "command": "echo 'Aplicando migraciones de base de datos...'; ./venv/bin/aerich fix-migrations && ./venv/bin/aerich upgrade",
+      "dependsOn": "kill:api",
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
       "label": "kill:api",
       "type": "shell",
       "command": "pids=$(lsof -ti:8000,8001 2>/dev/null); if [ -n \"$pids\" ]; then kill -9 $pids 2>/dev/null; fi",

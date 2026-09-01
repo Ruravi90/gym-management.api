@@ -47,6 +47,14 @@ ROUTINE_GENERATION_PROMPT = (
     '[{"exercise":"Nombre","sets":4,"reps":"8-12","rest_seconds":90,"notes":"instrucción. tip. error."}]}]}'
 )
 
+SPECIALIZED_RULES = {
+    "gym": "Usa series, repeticiones, peso y descansos tradicionales. Divide por grupos musculares cuando corresponda.",
+    "calisthenics": "Prioriza peso corporal y progresiones. Para habilidades usa regresiones seguras, isométricos por segundos y reps con control. No asignes muscle-up, planche o handstand avanzado a principiantes.",
+    "crossfit": "Diseña días con estructura CrossFit: AMRAP, EMOM, rounds for time o strength + metcon. Usa 'reps' como número, AMRAP o tiempo; indica el formato en el nombre del día y conserva descansos razonables.",
+}
+
+MODALITY_LABELS = {"gym": "gimnasio", "calisthenics": "calistenia", "crossfit": "CrossFit"}
+
 
 WEEKLY_CHECKIN_PROMPT = (
     "Coach de fitness. Genera REPORTE SEMANAL en español con markdown.\n"
@@ -232,6 +240,34 @@ def _bmi_category(bmi: Optional[float]) -> Optional[str]:
     return f"{bmi} (obesidad)"
 
 
+def _rank_exercise_candidates(catalog: List, modalities: List[str], goal: str, equipment: Optional[str], experience: Optional[str], injuries: Optional[str], limit: int = 60) -> List:
+    """Select a compact, safe candidate set before calling the LLM."""
+    blocked = (injuries or '').lower()
+    requested_equipment = (equipment or '').lower()
+    scored = []
+    for exercise in catalog:
+        if exercise.training_type not in modalities:
+            continue
+        name = (exercise.name or '').lower()
+        muscle = (exercise.muscle_group or '').lower()
+        score = 1
+        if requested_equipment and requested_equipment in (exercise.equipment or '').lower(): score += 3
+        if goal and goal.lower() in name: score += 1
+        if experience and (exercise.difficulty or '').lower() == experience.lower(): score += 2
+        if any(word in blocked for word in ('rodilla', 'knee')) and any(word in name for word in ('squat', 'lunge', 'leg press')): score -= 8
+        if any(word in blocked for word in ('hombro', 'shoulder')) and any(word in name for word in ('press', 'fly')): score -= 8
+        if any(word in blocked for word in ('espalda', 'lumbar', 'back')) and any(word in name for word in ('deadlift', 'good morning')): score -= 8
+        scored.append((score, muscle, exercise))
+    scored.sort(key=lambda item: item[0], reverse=True)
+    selected, muscles = [], set()
+    for score, muscle, exercise in scored:
+        if score < 0: continue
+        if muscle not in muscles or len(selected) >= limit - 12:
+            selected.append(exercise); muscles.add(muscle)
+        if len(selected) >= limit: break
+    return selected or catalog[:limit]
+
+
 async def generate_routine_plan(
     body_type: str,
     goal: str,
@@ -246,6 +282,7 @@ async def generate_routine_plan(
     sex: Optional[str] = None,
     daily_activity: Optional[str] = None,
     injuries: Optional[str] = None,
+    training_type: str = "gym",
 ) -> dict:
     """Pide al LLM una rutina semanal en JSON y devuelve {"ok", "plan"|, "reply"}.
 
@@ -264,6 +301,9 @@ async def generate_routine_plan(
             ),
         }
 
+    modalities = [m.strip().lower() for m in (training_type or "gym").split(",") if m.strip()]
+    modalities = list(dict.fromkeys(m for m in modalities if m in SPECIALIZED_RULES)) or ["gym"]
+    training_type = ",".join(modalities)
     body_info = BODY_TYPE_INFO.get(body_type, BODY_TYPE_INFO["mesomorph"])
     bmi = None
     if height_cm and weight_kg:
@@ -284,9 +324,19 @@ async def generate_routine_plan(
     if injuries:
         profile_parts.append(f"LESIONES:{injuries}")
 
-    catalog_lines = "\n".join(f"- {ex.name}" for ex in catalog)
+    # El catálogo completo se conserva para validar la respuesta, pero el LLM
+    # solo recibe una selección pequeña y balanceada de candidatos.
+    prompt_catalog = _rank_exercise_candidates(
+        catalog, modalities, goal, equipment, experience, injuries, limit=60
+    )
+    catalog_lines = "\n".join(
+        f"- {ex.name} (equipo: {ex.equipment or 'ninguno'}, nivel: {ex.difficulty})"
+        for ex in prompt_catalog
+    )
 
     user_message = (
+        f"Modalidades: {', '.join(MODALITY_LABELS[m] for m in modalities)}. "
+        f"Reglas: {' '.join(SPECIALIZED_RULES[m] for m in modalities)}\n"
         f"Perfil: {', '.join(profile_parts)}. "
         f"Objetivo:{goal or 'general'}. Días:{days_per_week}. "
         f"Equipo:{equipment or 'gimnasio'}. Exp:{experience or 'principiante'}. "
@@ -304,12 +354,14 @@ async def generate_routine_plan(
 
     # Normalizar el plan: números y campos por defecto
     days = []
+    used_exercises = set()
     for day in plan.get("days", []):
         exercises = []
         for i, ex in enumerate(day.get("exercises", [])):
             matched = match_exercise(ex.get("exercise", ""), catalog)
-            if not matched:
+            if not matched or matched.id in used_exercises:
                 continue
+            used_exercises.add(matched.id)
             exercises.append(
                 {
                     "exercise_id": matched.id,
@@ -479,10 +531,18 @@ def _fallback_routine_plan(
         sets, reps, rest = 3, "12-15", 45
 
     plan_days = []
+    used_exercises = set()
     for i, (name, group_set) in enumerate(templates):
         tmpl = _day_template(name, group_set, catalog, seed=i * 2, sets=sets, reps=reps, rest=rest)
+        tmpl["exercises"] = [
+            exercise for exercise in tmpl["exercises"]
+            if not (exercise["exercise_id"] in used_exercises or used_exercises.add(exercise["exercise_id"]))
+        ]
+        for order, exercise in enumerate(tmpl["exercises"]):
+            exercise["order"] = order
         tmpl["order"] = i
-        plan_days.append(tmpl)
+        if tmpl["exercises"]:
+            plan_days.append(tmpl)
 
     _rename_duplicate_days(plan_days, catalog)
 

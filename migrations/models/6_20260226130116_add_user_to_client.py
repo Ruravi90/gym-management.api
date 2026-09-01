@@ -5,8 +5,8 @@ RUN_IN_TRANSACTION = True
 
 async def upgrade(db: BaseDBAsyncClient) -> str:
     return """
-        ALTER TABLE `clients` ADD `user_id` INT;
-        ALTER TABLE `clients` ADD CONSTRAINT `fk_clients_users_888199a9` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;"""
+        SET @sql = IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'clients' AND COLUMN_NAME = 'user_id') = 0, 'ALTER TABLE `clients` ADD `user_id` INT', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+        SET @sql = IF((SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'fk_clients_users_888199a9') = 0, 'ALTER TABLE `clients` ADD CONSTRAINT `fk_clients_users_888199a9` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;"""
 
 
 async def downgrade(db: BaseDBAsyncClient) -> str:

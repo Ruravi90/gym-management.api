@@ -5,9 +5,9 @@ RUN_IN_TRANSACTION = True
 
 async def upgrade(db: BaseDBAsyncClient) -> str:
     return """
-        ALTER TABLE `memberships` ADD `mp_payment_status` VARCHAR(50);
-        ALTER TABLE `memberships` ADD `mp_payment_id` VARCHAR(100);
-        ALTER TABLE `memberships` ADD `mp_preference_id` VARCHAR(100);"""
+        SET @sql = IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'memberships' AND COLUMN_NAME = 'mp_payment_status') = 0, 'ALTER TABLE `memberships` ADD `mp_payment_status` VARCHAR(50)', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+        SET @sql = IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'memberships' AND COLUMN_NAME = 'mp_payment_id') = 0, 'ALTER TABLE `memberships` ADD `mp_payment_id` VARCHAR(100)', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+        SET @sql = IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'memberships' AND COLUMN_NAME = 'mp_preference_id') = 0, 'ALTER TABLE `memberships` ADD `mp_preference_id` VARCHAR(100)', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;"""
 
 
 async def downgrade(db: BaseDBAsyncClient) -> str:

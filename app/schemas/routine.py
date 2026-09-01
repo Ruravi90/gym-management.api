@@ -8,6 +8,7 @@ from datetime import date, datetime
 # ---------------------------------------------------------------
 class ExerciseBase(BaseModel):
     name: str
+    training_type: str = "gym"
     description: Optional[str] = None
     muscle_group: Optional[str] = None
     body_part: Optional[str] = None
@@ -21,6 +22,8 @@ class ExerciseBase(BaseModel):
     modifications: Optional[str] = None
     gif_url: Optional[str] = None
     gif_urls: Optional[List[str]] = None
+    video_url: Optional[str] = None
+
     image_url: Optional[str] = None
 
 
@@ -43,6 +46,7 @@ class ExerciseUpdate(BaseModel):
     modifications: Optional[str] = None
     gif_url: Optional[str] = None
     gif_urls: Optional[List[str]] = None
+    video_url: Optional[str] = None
     image_url: Optional[str] = None
     is_active: Optional[bool] = None
 
@@ -247,6 +251,9 @@ class RoutineGenerationRequest(ProfileUpdate):
     equipment: Optional[str] = Field(default=None, max_length=50)
     experience: Optional[str] = Field(default=None, max_length=50)
     duration_minutes: Optional[int] = Field(default=60, ge=15, le=180)
+    # Puede ser una modalidad individual o una combinación separada por comas.
+    training_type: str = Field(default="gym", max_length=100)
+    client_id: Optional[int] = Field(default=None, ge=1)
 
 
 class RoutineGenerationResponse(BaseModel):

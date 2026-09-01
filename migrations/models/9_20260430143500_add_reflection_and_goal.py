@@ -5,9 +5,9 @@ RUN_IN_TRANSACTION = True
 
 async def upgrade(db: BaseDBAsyncClient) -> str:
     return """
-        ALTER TABLE `kaizen_habits` ADD COLUMN `reflection` LONGTEXT;
-        ALTER TABLE `kaizen_habits` ADD COLUMN `goal` LONGTEXT;
-        ALTER TABLE `kaizen_logs` ADD COLUMN `reflection` LONGTEXT;"""
+        SET @sql = IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'kaizen_habits' AND COLUMN_NAME = 'reflection') = 0, 'ALTER TABLE `kaizen_habits` ADD COLUMN `reflection` LONGTEXT', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+        SET @sql = IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'kaizen_habits' AND COLUMN_NAME = 'goal') = 0, 'ALTER TABLE `kaizen_habits` ADD COLUMN `goal` LONGTEXT', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+        SET @sql = IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'kaizen_logs' AND COLUMN_NAME = 'reflection') = 0, 'ALTER TABLE `kaizen_logs` ADD COLUMN `reflection` LONGTEXT', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;"""
 
 
 async def downgrade(db: BaseDBAsyncClient) -> str:

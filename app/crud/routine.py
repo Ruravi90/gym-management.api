@@ -19,6 +19,8 @@ async def list_exercises(
     search: Optional[str] = None,
     muscle_group: Optional[str] = None,
     equipment: Optional[str] = None,
+    training_type: Optional[str] = None,
+    difficulty: Optional[str] = None,
     include_inactive: bool = False,
 ) -> List[Exercise]:
     qs = Exercise.all()
@@ -28,6 +30,10 @@ async def list_exercises(
         qs = qs.filter(muscle_group=muscle_group)
     if equipment:
         qs = qs.filter(equipment=equipment)
+    if training_type:
+        qs = qs.filter(training_type=training_type)
+    if difficulty:
+        qs = qs.filter(difficulty=difficulty)
     if search:
         qs = qs.filter(name__icontains=search)
     return await qs.order_by("name")

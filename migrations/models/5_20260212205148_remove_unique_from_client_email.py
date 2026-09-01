@@ -5,7 +5,7 @@ RUN_IN_TRANSACTION = True
 
 async def upgrade(db: BaseDBAsyncClient) -> str:
     return """
-        ALTER TABLE `clients` DROP INDEX `email`;"""
+        SET @sql = IF((SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'clients' AND INDEX_NAME = 'email') > 0, 'ALTER TABLE `clients` DROP INDEX `email`', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;"""
 
 
 async def downgrade(db: BaseDBAsyncClient) -> str:

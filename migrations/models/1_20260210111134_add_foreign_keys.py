@@ -5,9 +5,9 @@ RUN_IN_TRANSACTION = True
 
 async def upgrade(db: BaseDBAsyncClient) -> str:
     return """
-        ALTER TABLE `facial_encodings` ADD CONSTRAINT `fk_facial_e_clients_3a7d0063` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE;
-        ALTER TABLE `memberships` ADD CONSTRAINT `fk_membersh_clients_23275b71` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE;
-        ALTER TABLE `memberships` ADD CONSTRAINT `fk_membersh_membersh_37ad3859` FOREIGN KEY (`membership_type_id`) REFERENCES `membership_types` (`id`) ON DELETE SET NULL;"""
+        SET @sql = IF((SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'fk_facial_e_clients_3a7d0063') = 0, 'ALTER TABLE `facial_encodings` ADD CONSTRAINT `fk_facial_e_clients_3a7d0063` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+        SET @sql = IF((SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'fk_membersh_clients_23275b71') = 0, 'ALTER TABLE `memberships` ADD CONSTRAINT `fk_membersh_clients_23275b71` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+        SET @sql = IF((SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'fk_membersh_membersh_37ad3859') = 0, 'ALTER TABLE `memberships` ADD CONSTRAINT `fk_membersh_membersh_37ad3859` FOREIGN KEY (`membership_type_id`) REFERENCES `membership_types` (`id`) ON DELETE SET NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;"""
 
 
 async def downgrade(db: BaseDBAsyncClient) -> str:
