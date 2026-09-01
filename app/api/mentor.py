@@ -79,6 +79,7 @@ async def get_messages(
     current_user: User = Depends(get_current_user),
 ):
     """Devuelve el historial de mensajes del mentor para el cliente."""
+    is_staff = current_user.role in {"admin", "manager", "super_admin"}
     client = await get_current_client(current_user)
     messages = await crud.mentor.get_client_messages(client_id=client.id, limit=50)
     return messages
@@ -310,7 +311,15 @@ async def get_profile(
     current_user: User = Depends(get_current_user),
 ):
     """Perfil físico del cliente: tipo de cuerpo, altura, edad, sexo, actividad y lesiones."""
-    client = await get_current_client(current_user)
+    if request.client_id is not None:
+        is_staff = current_user.role in {"admin", "manager", "super_admin"}
+        if not is_staff:
+            raise HTTPException(status_code=403, detail="Solo el staff puede generar rutinas para otro cliente.")
+        client = await Client.get_or_none(id=request.client_id)
+        if not client or (current_user.role != "super_admin" and client.tenant_id != current_user.tenant_id):
+            raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    else:
+        client = await get_current_client(current_user)
     return await _profile_response(client, current_user)
 
 
@@ -343,7 +352,20 @@ async def generate_routine(
     Si el cliente aún no tiene tipo de cuerpo y no lo envía, el mentor responde
     pidiéndole que elija uno (ask_body_type=True).
     """
-    client = await get_current_client(current_user)
+    if request.client_id is not None:
+        if current_user.role not in {"admin", "manager", "super_admin"}:
+            raise HTTPException(status_code=403, detail="Solo el staff puede generar rutinas para otro cliente.")
+        client = await Client.get_or_none(id=request.client_id)
+        if not client or (current_user.role != "super_admin" and client.tenant_id != current_user.tenant_id):
+            raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    else:
+        client = await get_current_client(current_user)
+
+    training_type = (request.training_type or "gym").strip().lower()
+    modalities = list(dict.fromkeys(m.strip() for m in training_type.split(",") if m.strip()))
+    if not modalities or any(m not in {"gym", "calisthenics", "crossfit"} for m in modalities):
+        raise HTTPException(status_code=400, detail="Modalidad inválida. Usa gym, calisthenics y/o crossfit.")
+    training_type = ",".join(modalities)
 
     # Límite: máximo 2 rutinas generadas por IA al mes
     now = datetime.now()
@@ -351,6 +373,7 @@ async def generate_routine(
     routines_this_month = await crud.routine.Routine.filter(
         client_id=client.id,
         created_at__gte=month_start,
+        description__startswith="[IA]",
     ).count()
     if routines_this_month >= 2:
         return schemas.routine.RoutineGenerationResponse(
@@ -362,7 +385,12 @@ async def generate_routine(
             ),
         )
 
-    body_type = request.body_type.strip().lower() if request.body_type else (current_user.body_type or "")
+    profile_owner = current_user
+    if client.user_id and client.user_id != current_user.id:
+        profile_owner = await User.get_or_none(id=client.user_id) or current_user
+    effective_goal = request.goal if request.goal != "general" else (profile_owner.goal or request.goal)
+    effective_injuries = "; ".join(value for value in (profile_owner.injuries, profile_owner.restrictions, request.injuries) if value)
+    body_type = request.body_type.strip().lower() if request.body_type else (profile_owner.body_type or "")
     if body_type and body_type not in schemas.routine.BODY_TYPES:
         raise HTTPException(
             status_code=400,
@@ -386,7 +414,8 @@ async def generate_routine(
     # Guardar el intake del instructor en el perfil
     profile_data = request.model_dump(exclude_unset=True)
     profile_data["body_type"] = body_type
-    await _save_profile(current_user, profile_data)
+    # En Admin, el intake pertenece al cliente seleccionado, no al administrador.
+    await _save_profile(profile_owner, profile_data)
 
     # Guardar el peso del intake como medición de hoy (si se indicó) para el IMC
     if request.weight_kg is not None:
@@ -396,7 +425,8 @@ async def generate_routine(
             data=schemas.measurement.BodyMeasurementCreate(date=date_cls.today(), weight_kg=request.weight_kg),
         )
 
-    catalog = await crud.routine.list_exercises()
+    catalogs = [await crud.routine.list_exercises(training_type=m) for m in modalities]
+    catalog = list({ex.id: ex for items in catalogs for ex in items}.values())
     if not catalog:
         return schemas.routine.RoutineGenerationResponse(
             ok=False,
@@ -409,18 +439,19 @@ async def generate_routine(
 
     result = await mentor_service.generate_routine_plan(
         body_type=body_type,
-        goal=request.goal,
+        goal=effective_goal,
         days_per_week=request.days_per_week,
         equipment=request.equipment,
         experience=request.experience,
         duration_minutes=request.duration_minutes,
         catalog=catalog,
-        height_cm=request.height_cm or current_user.height_cm,
+        height_cm=request.height_cm or profile_owner.height_cm,
         weight_kg=weight_kg,
-        age=request.age or current_user.age,
-        sex=request.sex or current_user.sex,
-        daily_activity=request.daily_activity or current_user.daily_activity,
-        injuries=request.injuries or current_user.injuries,
+        age=request.age or profile_owner.age,
+        sex=request.sex or profile_owner.sex,
+        daily_activity=request.daily_activity or profile_owner.daily_activity,
+        injuries=effective_injuries,
+        training_type=training_type,
     )
 
     if not result.get("ok"):
@@ -432,7 +463,7 @@ async def generate_routine(
     plan = result["plan"]
     routine_data = schemas.routine.RoutineCreate(
         name=plan["name"],
-        description=plan.get("description"),
+        description=f"[IA] {plan.get('description') or 'Rutina generada con IA'}",
         is_active=True,
         days=[schemas.routine.RoutineDayCreate(**d) for d in plan["days"]],
     )
@@ -450,7 +481,7 @@ async def generate_routine(
     reply = (
         f"🎉 ¡Listo! Creé tu rutina **\"{routine.name}\"** con {len(routine.days)} día(s) "
         f"y {total_exercises} ejercicios, adaptada a tu tipo de cuerpo ({body_type}) "
-        f"y tu objetivo ({request.goal}). Ya puedes abrirla y empezar a entrenar con "
+        f"y tu objetivo ({request.goal}) en modalidad {training_type}. Ya puedes abrirla y empezar a entrenar con "
         f"los GIFs de cada ejercicio. ¡A darle! 💪🔥"
     )
 

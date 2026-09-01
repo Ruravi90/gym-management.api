@@ -28,6 +28,10 @@ class User(Model):
     sex = fields.CharField(max_length=10, null=True)  # masculino | femenino | otro
     daily_activity = fields.CharField(max_length=20, null=True)  # sedentario | ligero | moderado | activo
     injuries = fields.TextField(null=True)
+    birth_date = fields.DateField(null=True)
+    goal = fields.CharField(max_length=30, null=True)
+    restrictions = fields.TextField(null=True)
+    emergency_contact = fields.CharField(max_length=150, null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
     password_setup_at = fields.DatetimeField(null=True)

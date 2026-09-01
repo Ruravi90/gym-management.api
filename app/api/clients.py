@@ -5,6 +5,9 @@ from app.services.facial_recognition import FacialRecognitionService
 from app.utils.auth import get_current_user
 
 from app.models.user import User as UserModel
+from app.models.user import UserRoleEnum
+from app.utils.auth import hash_password
+import secrets
 
 from app.utils.logging import logger
 from app.services.billing_limits import ensure_within_limit
@@ -36,7 +39,8 @@ async def create_client(client: schemas.ClientCreate, current_user: UserModel = 
             
     return await crud.client.create_client(
         client_data=client.dict(),
-        user_id=current_user.id,
+        # The client profile must not point to the staff user creating it.
+        user_id=None,
         ip_address=None,
         user_agent=None,
         tenant_id=tenant_id,
@@ -76,9 +80,30 @@ async def update_client(client_id: int, client_update: schemas.ClientUpdate, cur
     db_client = await crud.client.get_client(client_id=client_id, tenant_id=tenant_id)
     if db_client is None:
         raise HTTPException(status_code=404, detail="Client not found")
+    profile_fields = {"birth_date", "body_type", "height_cm", "sex", "injuries", "goal", "restrictions", "emergency_contact"}
+    update_data = client_update.dict(exclude_unset=True)
+    profile = {key: update_data.pop(key) for key in list(update_data) if key in profile_fields}
+    if profile:
+        user = await UserModel.get_or_none(id=db_client.user_id) if db_client.user_id else None
+        # Legacy records may point to the staff user. Never overwrite staff profile data.
+        if not user or user.role != UserRoleEnum.USER:
+            user = await UserModel.create(
+                name=db_client.name,
+                # Client.email is the contact email and may already belong to
+                # another account; User.email is globally unique.
+                email=None,
+                phone=db_client.phone,
+                role=UserRoleEnum.USER,
+                hashed_password=hash_password(secrets.token_urlsafe(32)),
+                tenant_id=db_client.tenant_id,
+            )
+            db_client.user_id = user.id
+            await db_client.save(update_fields=["user_id", "updated_at"])
+        await user.update_from_dict(profile)
+        await user.save()
     return await crud.client.update_client(
         client_id=client_id,
-        client_update=client_update.dict(exclude_unset=True),
+        client_update=update_data,
         user_id=current_user.id,
         ip_address=None,
         user_agent=None,

@@ -11,7 +11,7 @@ async def get_client(client_id: int, tenant_id: Optional[int] = None) -> Optiona
         filters = {"id": client_id}
         if tenant_id is not None:
             filters["tenant_id"] = tenant_id
-        return await Client.get(**filters)
+        return await Client.get(**filters).prefetch_related("user")
     except DoesNotExist:
         return None
 
@@ -47,7 +47,7 @@ async def get_clients(skip: int = 0, limit: int = 100, tenant_id: Optional[int] 
     query = Client.all()
     if tenant_id is not None:
         query = query.filter(tenant_id=tenant_id)
-    return await query.offset(skip).limit(limit)
+    return await query.prefetch_related("user").offset(skip).limit(limit)
 
 
 async def create_client(

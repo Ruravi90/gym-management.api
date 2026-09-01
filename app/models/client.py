@@ -31,3 +31,20 @@ class Client(Model):
     
     def __str__(self):
         return self.name
+
+    @property
+    def birth_date(self): return self.user.birth_date if self.user else None
+    @property
+    def body_type(self): return self.user.body_type if self.user else None
+    @property
+    def height_cm(self): return self.user.height_cm if self.user else None
+    @property
+    def sex(self): return self.user.sex if self.user else None
+    @property
+    def injuries(self): return self.user.injuries if self.user else None
+    @property
+    def goal(self): return self.user.goal if self.user else None
+    @property
+    def restrictions(self): return self.user.restrictions if self.user else None
+    @property
+    def emergency_contact(self): return self.user.emergency_contact if self.user else None
