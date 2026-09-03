@@ -5,7 +5,6 @@ from fastapi import FastAPI, Depends, HTTPException, Request
 from app.config import settings
 from app.utils.logging import setup_logging
 import asyncio
-from aerich import Command
 
 # Initialize logging
 logger = setup_logging()
@@ -107,7 +106,7 @@ from app.config import TORTOISE_CONFIG
 register_tortoise(
     app,
     config=TORTOISE_CONFIG,
-    generate_schemas=True,  # Automatically generate schema
+    generate_schemas=False,
     add_exception_handlers=True,
 )
 
@@ -340,7 +339,8 @@ async def startup_event():
         logger.error(f"❌ Error during migration setup: {str(e)}")
     '''
 
-    # Import and run seeders after database initialization
+    # Migrations are applied by entrypoint.sh before the API starts.
+    # Import and run seeders after database initialization.
     try:
         from app.seeders.seed_data import seed_super_admin, seed_membership_types
         from app.seeders.seed_plans import seed_plans
