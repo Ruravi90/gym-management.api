@@ -5,15 +5,15 @@ RUN_IN_TRANSACTION = True
 
 async def upgrade(db: BaseDBAsyncClient) -> str:
     return """
-        ALTER TABLE `exercises` ADD COLUMN `training_type` VARCHAR(20) NOT NULL DEFAULT 'gym';
-        CREATE INDEX `idx_exercises_training_type` ON `exercises` (`training_type`);
+        SET @sql = IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'exercises' AND COLUMN_NAME = 'training_type') = 0, 'ALTER TABLE `exercises` ADD COLUMN `training_type` VARCHAR(20) NOT NULL DEFAULT ''gym''', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+        SET @sql = IF((SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'exercises' AND INDEX_NAME = 'idx_exercises_training_type') = 0, 'CREATE INDEX `idx_exercises_training_type` ON `exercises` (`training_type`)', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
         """
 
 
 async def downgrade(db: BaseDBAsyncClient) -> str:
     return """
-        DROP INDEX `idx_exercises_training_type` ON `exercises`;
-        ALTER TABLE `exercises` DROP COLUMN `training_type`;
+        SET @sql = IF((SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'exercises' AND INDEX_NAME = 'idx_exercises_training_type') > 0, 'DROP INDEX `idx_exercises_training_type` ON `exercises`', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+        SET @sql = IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'exercises' AND COLUMN_NAME = 'training_type') > 0, 'ALTER TABLE `exercises` DROP COLUMN `training_type`', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
         """
 
 
