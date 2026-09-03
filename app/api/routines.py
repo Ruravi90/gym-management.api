@@ -1,30 +1,26 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional
 from app import crud, schemas
-from app.utils.auth import get_current_user
+from app.utils.auth import get_current_principal
 from app.models.user import User
 from app.models.client import Client
 
 router = APIRouter()
 
+# Compatibilidad interna para las rutas existentes; la dependencia ya
+# resuelve sesión administrativa o sesión exclusiva de cliente.
+get_current_user = get_current_principal
 
-async def get_current_client(current_user: User = Depends(get_current_user)):
-    """Obtiene (o crea) el perfil de cliente del usuario autenticado."""
-    client = await Client.get_or_none(user_id=current_user.id)
-    if not client:
-        tenant_id = getattr(current_user, 'tenant_id', None)
-        client = await Client.create(
-            name=current_user.name,
-            email=current_user.email,
-            phone=current_user.phone,
-            user_id=current_user.id,
-            tenant_id=tenant_id,
-        )
-    return client
+
+async def get_current_client(principal=Depends(get_current_principal)):
+    """Obtiene el socio autenticado sin crear ni consultar usuarios."""
+    if isinstance(principal, Client):
+        return principal
+    raise HTTPException(status_code=401, detail="Se requiere una sesión de cliente")
 
 
 def is_staff(user: User) -> bool:
-    return user.role in ("admin", "super_admin", "manager", "receptionist")
+    return isinstance(user, User) and user.role in ("admin", "super_admin", "manager", "receptionist")
 
 
 # ===============================================================
@@ -34,10 +30,10 @@ def is_staff(user: User) -> bool:
 async def get_routines(
     client_id: Optional[int] = Query(None, description="Filtrar por cliente (solo staff)"),
     search: Optional[str] = Query(None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_principal),
 ):
     """Rutinas del cliente autenticado. El staff puede listar todas o filtrar por cliente."""
-    if client_id is not None and is_staff(current_user):
+    if is_staff(current_user):
         return await crud.routine.list_all_routines(client_id=client_id, search=search)
     client = await get_current_client(current_user)
     return await crud.routine.get_client_routines(client_id=client.id)

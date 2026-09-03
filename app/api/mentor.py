@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from app import crud, schemas
-from app.utils.auth import get_current_user
+from app.utils.auth import get_current_user, get_current_principal
 from app.models.user import User
 from app.models.client import Client
 from app.services import mentor as mentor_service
@@ -14,18 +14,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def get_current_client(current_user: User = Depends(get_current_user)):
-    client = await Client.get_or_none(user_id=current_user.id)
-    if not client:
-        tenant_id = getattr(current_user, 'tenant_id', None)
-        client = await Client.create(
-            name=current_user.name,
-            email=current_user.email,
-            phone=current_user.phone,
-            user_id=current_user.id,
-            tenant_id=tenant_id,
-        )
-    return client
+async def get_current_client(principal=Depends(get_current_principal)):
+    if isinstance(principal, Client):
+        return principal
+    raise HTTPException(status_code=401, detail="Se requiere una sesión de cliente")
 
 
 async def _build_context(client: Client, current_user: User) -> str:
@@ -38,20 +30,20 @@ async def _build_context(client: Client, current_user: User) -> str:
         routines,
         recent_sessions,
         measurements,
-        body_type=current_user.body_type,
-        height_cm=current_user.height_cm,
-        age=current_user.age,
+        body_type=client.body_type,
+        height_cm=client.height_cm,
+        age=client.age,
         weight_kg=latest_weight,
     )
 
 
-async def _save_profile(current_user: User, data: dict) -> None:
+async def _save_profile(client: Client, data: dict) -> None:
     """Guarda los campos de perfil físico enviados (solo los que vienen)."""
-    allowed = ("body_type", "height_cm", "age", "sex", "daily_activity", "injuries")
+    allowed = ("birth_date", "body_type", "height_cm", "age", "sex", "daily_activity", "injuries", "goal", "restrictions", "emergency_contact")
     update = {k: v for k, v in data.items() if k in allowed and v is not None}
     if update:
-        await current_user.update_from_dict(update)
-        await current_user.save()
+        await client.update_from_dict(update)
+        await client.save()
 
 
 async def _profile_response(client: Client, current_user: User):
@@ -59,16 +51,16 @@ async def _profile_response(client: Client, current_user: User):
     measurements = await crud.measurement.list_measurements(client_id=client.id, limit=1)
     weight = float(measurements[0].weight_kg) if measurements and measurements[0].weight_kg is not None else None
     bmi = None
-    if current_user.height_cm and weight:
-        m = current_user.height_cm / 100.0
+    if client.height_cm and weight:
+        m = client.height_cm / 100.0
         bmi = round(weight / (m * m), 1)
     return schemas.routine.ProfileResponse(
-        body_type=current_user.body_type,
-        height_cm=current_user.height_cm,
-        age=current_user.age,
-        sex=current_user.sex,
-        daily_activity=current_user.daily_activity,
-        injuries=current_user.injuries,
+        body_type=client.body_type,
+        height_cm=client.height_cm,
+        age=client.age,
+        sex=client.sex,
+        daily_activity=client.daily_activity,
+        injuries=client.injuries,
         weight_kg=weight,
         bmi=bmi,
     )
@@ -76,10 +68,9 @@ async def _profile_response(client: Client, current_user: User):
 
 @router.get("/messages", response_model=list[schemas.routine.MentorMessageResponse])
 async def get_messages(
-    current_user: User = Depends(get_current_user),
+    current_user: Client = Depends(get_current_principal),
 ):
     """Devuelve el historial de mensajes del mentor para el cliente."""
-    is_staff = current_user.role in {"admin", "manager", "super_admin"}
     client = await get_current_client(current_user)
     messages = await crud.mentor.get_client_messages(client_id=client.id, limit=50)
     return messages
@@ -87,7 +78,7 @@ async def get_messages(
 
 @router.post("/weekly-checkin", response_model=schemas.routine.MentorResponse)
 async def weekly_checkin(
-    current_user: User = Depends(get_current_user),
+    current_user: Client = Depends(get_current_principal),
 ):
     """Genera el reporte semanal: medidas vs semana anterior + adherencia a la rutina + recomendaciones."""
     try:
@@ -155,7 +146,7 @@ async def weekly_checkin(
 
 @router.post("/monthly-report", response_model=schemas.routine.MentorResponse)
 async def monthly_report(
-    current_user: User = Depends(get_current_user),
+    current_user: Client = Depends(get_current_principal),
 ):
     """Genera el reporte mensual: tendencia completa de 4 semanas + recomendación de rutina."""
     try:
@@ -211,17 +202,17 @@ async def monthly_report(
 
         # Construir contexto más detallado para el mensual
         lines = []
-        if current_user.body_type:
-            info = mentor_service.BODY_TYPE_INFO.get(current_user.body_type, "")
-            lines.append(f"Cuerpo: {current_user.body_type}. {info}")
-        if current_user.age:
-            lines.append(f"Edad: {current_user.age}a")
-        if current_user.height_cm and measurements:
+        if client.body_type:
+            info = mentor_service.BODY_TYPE_INFO.get(client.body_type, "")
+            lines.append(f"Cuerpo: {client.body_type}. {info}")
+        if client.age:
+            lines.append(f"Edad: {client.age}a")
+        if client.height_cm and measurements:
             last_w = next((m.weight_kg for m in measurements if m.weight_kg), None)
             if last_w:
-                m = current_user.height_cm / 100.0
+                m = client.height_cm / 100.0
                 bmi = round(float(last_w) / (m * m), 1)
-                lines.append(f"Altura: {current_user.height_cm}cm, Peso: {last_w}kg, IMC: {mentor_service._bmi_category(bmi)}")
+                lines.append(f"Altura: {client.height_cm}cm, Peso: {last_w}kg, IMC: {mentor_service._bmi_category(bmi)}")
 
         active = [r for r in routines if r.is_active]
         if active:
@@ -268,7 +259,7 @@ async def monthly_report(
 
 @router.get("/body-type", response_model=schemas.routine.BodyTypeResponse)
 async def get_body_type(
-    current_user: User = Depends(get_current_user),
+    current_user: Client = Depends(get_current_principal),
 ):
     """Devuelve el tipo de cuerpo guardado del cliente (si lo tiene)."""
     if current_user.body_type:
@@ -285,7 +276,7 @@ async def get_body_type(
 @router.post("/body-type", response_model=schemas.routine.BodyTypeResponse)
 async def save_body_type(
     request: schemas.routine.BodyTypeRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: Client = Depends(get_current_principal),
 ):
     """Guarda el tipo de cuerpo del cliente (ectomorph, mesomorph o endomorph)."""
     body_type = request.body_type.strip().lower()
@@ -308,25 +299,17 @@ async def save_body_type(
 
 @router.get("/profile", response_model=schemas.routine.ProfileResponse)
 async def get_profile(
-    current_user: User = Depends(get_current_user),
+    current_user: Client = Depends(get_current_principal),
 ):
     """Perfil físico del cliente: tipo de cuerpo, altura, edad, sexo, actividad y lesiones."""
-    if request.client_id is not None:
-        is_staff = current_user.role in {"admin", "manager", "super_admin"}
-        if not is_staff:
-            raise HTTPException(status_code=403, detail="Solo el staff puede generar rutinas para otro cliente.")
-        client = await Client.get_or_none(id=request.client_id)
-        if not client or (current_user.role != "super_admin" and client.tenant_id != current_user.tenant_id):
-            raise HTTPException(status_code=404, detail="Cliente no encontrado")
-    else:
-        client = await get_current_client(current_user)
+    client = await get_current_client(current_user)
     return await _profile_response(client, current_user)
 
 
 @router.post("/profile", response_model=schemas.routine.ProfileResponse)
 async def save_profile(
     request: schemas.routine.ProfileUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: Client = Depends(get_current_principal),
 ):
     """Guarda (parcialmente) el perfil físico del cliente."""
     data = request.model_dump(exclude_unset=True)
@@ -337,15 +320,15 @@ async def save_profile(
                 status_code=400,
                 detail="Tipo de cuerpo inválido. Usa: ectomorph, mesomorph o endomorph.",
             )
-    await _save_profile(current_user, data)
     client = await get_current_client(current_user)
+    await _save_profile(client, data)
     return await _profile_response(client, current_user)
 
 
 @router.post("/generate-routine", response_model=schemas.routine.RoutineGenerationResponse)
 async def generate_routine(
     request: schemas.routine.RoutineGenerationRequest,
-    current_user: User = Depends(get_current_user),
+    current_user = Depends(get_current_principal),
 ):
     """Genera una rutina personalizada con IA y la crea en la BD (con ejercicios del catálogo).
 
@@ -353,7 +336,7 @@ async def generate_routine(
     pidiéndole que elija uno (ask_body_type=True).
     """
     if request.client_id is not None:
-        if current_user.role not in {"admin", "manager", "super_admin"}:
+        if not isinstance(current_user, User) or current_user.role not in {"admin", "manager", "super_admin"}:
             raise HTTPException(status_code=403, detail="Solo el staff puede generar rutinas para otro cliente.")
         client = await Client.get_or_none(id=request.client_id)
         if not client or (current_user.role != "super_admin" and client.tenant_id != current_user.tenant_id):
@@ -385,12 +368,10 @@ async def generate_routine(
             ),
         )
 
-    profile_owner = current_user
-    if client.user_id and client.user_id != current_user.id:
-        profile_owner = await User.get_or_none(id=client.user_id) or current_user
-    effective_goal = request.goal if request.goal != "general" else (profile_owner.goal or request.goal)
-    effective_injuries = "; ".join(value for value in (profile_owner.injuries, profile_owner.restrictions, request.injuries) if value)
-    body_type = request.body_type.strip().lower() if request.body_type else (profile_owner.body_type or "")
+    profile_owner = client
+    effective_goal = request.goal if request.goal != "general" else (client.goal or request.goal)
+    effective_injuries = "; ".join(value for value in (client.injuries, client.restrictions, request.injuries) if value)
+    body_type = request.body_type.strip().lower() if request.body_type else (client.body_type or "")
     if body_type and body_type not in schemas.routine.BODY_TYPES:
         raise HTTPException(
             status_code=400,
@@ -445,11 +426,11 @@ async def generate_routine(
         experience=request.experience,
         duration_minutes=request.duration_minutes,
         catalog=catalog,
-        height_cm=request.height_cm or profile_owner.height_cm,
+        height_cm=request.height_cm or client.height_cm,
         weight_kg=weight_kg,
-        age=request.age or profile_owner.age,
-        sex=request.sex or profile_owner.sex,
-        daily_activity=request.daily_activity or profile_owner.daily_activity,
+        age=request.age or client.age,
+        sex=request.sex or client.sex,
+        daily_activity=request.daily_activity or client.daily_activity,
         injuries=effective_injuries,
         training_type=training_type,
     )

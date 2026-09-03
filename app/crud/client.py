@@ -11,7 +11,7 @@ async def get_client(client_id: int, tenant_id: Optional[int] = None) -> Optiona
         filters = {"id": client_id}
         if tenant_id is not None:
             filters["tenant_id"] = tenant_id
-        return await Client.get(**filters).prefetch_related("user")
+        return await Client.get(**filters)
     except DoesNotExist:
         return None
 
@@ -36,31 +36,22 @@ async def get_client_by_phone(phone: str, tenant_id: Optional[int] = None) -> Op
         return None
 
 
-async def get_client_by_user_id(user_id: int) -> Optional[Client]:
-    try:
-        return await Client.get(user_id=user_id)
-    except DoesNotExist:
-        return None
-
-
 async def get_clients(skip: int = 0, limit: int = 100, tenant_id: Optional[int] = None) -> List[Client]:
     query = Client.all()
     if tenant_id is not None:
         query = query.filter(tenant_id=tenant_id)
-    return await query.prefetch_related("user").offset(skip).limit(limit)
+    return await query.offset(skip).limit(limit)
 
 
 async def create_client(
     client_data: dict,
-    user_id: Optional[int] = None,
     ip_address: Optional[str] = None,
     user_agent: Optional[str] = None,
     tenant_id: Optional[int] = None,
 ) -> Client:
-    db_user_id = client_data.pop("user_id", None)
     if tenant_id is not None:
         client_data["tenant_id"] = tenant_id
-    client = await Client.create(**client_data, user_id=db_user_id)
+    client = await Client.create(**client_data)
 
     await AuditService.log_creation(
         user_id=user_id,

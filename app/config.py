@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     WAHA_API_KEY: str = os.getenv("WAHA_API_KEY", "")
     # Cuando WAHA_API_KEY usa sha512:..., el cliente debe enviar la clave plana.
     WAHA_API_KEY_PLAIN: str = os.getenv("WAHA_API_KEY_PLAIN", "")
-    WAHA_MASTER_SESSION: str = os.getenv("WAHA_MASTER_SESSION", os.getenv("WAHA_SYSTEM_INSTANCE", "default"))
+    WAHA_MASTER_SESSION: str = os.getenv("WAHA_MASTER_SESSION") or os.getenv("WAHA_SYSTEM_INSTANCE", "default")
     WAHA_SYSTEM_INSTANCE: str = os.getenv("WAHA_SYSTEM_INSTANCE", "")
     WAHA_ENABLED: bool = os.getenv("WAHA_ENABLED", "false").lower() == "true"
     WAHA_SYSTEM_ENABLED: bool = os.getenv("WAHA_SYSTEM_ENABLED", "false").lower() == "true"

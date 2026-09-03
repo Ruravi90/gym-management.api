@@ -1,36 +1,28 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List
 from app import crud, schemas
-from app.utils.auth import get_current_user
+from app.utils.auth import get_current_principal
 from app.models.user import User
 from app.models.client import Client
 
 router = APIRouter()
 
 
-async def get_current_client(current_user: User = Depends(get_current_user)):
-    client = await Client.get_or_none(user_id=current_user.id)
-    if not client:
-        tenant_id = getattr(current_user, 'tenant_id', None)
-        client = await Client.create(
-            name=current_user.name,
-            email=current_user.email,
-            phone=current_user.phone,
-            user_id=current_user.id,
-            tenant_id=tenant_id,
-        )
-    return client
+async def get_current_client(principal=Depends(get_current_principal)):
+    if isinstance(principal, Client):
+        return principal
+    raise HTTPException(status_code=401, detail="Se requiere una sesión de cliente")
 
 
 def is_staff(user: User) -> bool:
-    return user.role in ("admin", "super_admin", "manager", "receptionist")
+    return isinstance(user, User) and user.role in ("admin", "super_admin", "manager", "receptionist")
 
 
 @router.get("", response_model=List[schemas.measurement.BodyMeasurementResponse])
 async def get_measurements(
     limit: int = Query(100, ge=1, le=500),
     client_id: int = Query(None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_principal),
 ):
     """Medidas de un cliente. Staff puede pasar client_id para ver las de cualquier cliente."""
     if client_id and is_staff(current_user):
@@ -45,7 +37,7 @@ async def get_measurements(
 async def create_measurement(
     measurement: schemas.measurement.BodyMeasurementCreate,
     client_id: int = Query(None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_principal),
 ):
     """Registra (o actualiza) las medidas de una fecha. Una entrada por fecha.
     Staff puede pasar client_id para registrar medidas de otro cliente."""
@@ -71,7 +63,7 @@ async def create_measurement(
 async def update_measurement(
     measurement_id: int,
     measurement: schemas.measurement.BodyMeasurementUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_principal),
 ):
     db_measurement = await crud.measurement.get_measurement(measurement_id)
     if not db_measurement:
@@ -86,7 +78,7 @@ async def update_measurement(
 @router.delete("/{measurement_id}", status_code=204)
 async def delete_measurement(
     measurement_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_principal),
 ):
     db_measurement = await crud.measurement.get_measurement(measurement_id)
     if not db_measurement:

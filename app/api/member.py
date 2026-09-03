@@ -1,26 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from app import crud, models, schemas
-from app.utils.auth import get_current_user
-from app.models.user import User as UserModel
+from app.utils.auth import get_current_client as get_authenticated_client
 from app.models.client import Client as ClientModel
 from typing import List
 
 router = APIRouter()
 
-async def get_current_client(current_user: UserModel = Depends(get_current_user)) -> ClientModel:
-    client = await ClientModel.get_or_none(user_id=current_user.id)
-    if not client:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Client profile not found for this user"
-        )
-    # Tenant isolation: non-super_admin users can only access their own tenant's data
-    if current_user.role != "super_admin" and client.tenant_id != current_user.tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Client profile not found for this user"
-        )
-    return client
+get_current_client = get_authenticated_client
 
 @router.get("/me", response_model=schemas.Client)
 async def read_member_profile(client: ClientModel = Depends(get_current_client)):

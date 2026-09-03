@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List
 from app import crud, schemas
-from app.utils.auth import get_current_user
+from app.utils.auth import get_current_user, get_current_principal
 from app.models.user import User
+from app.models.client import Client
 
 router = APIRouter()
 
@@ -12,12 +13,14 @@ async def read_membership_types(
     skip: int = 0,
     limit: int = 100,
     active_only: bool = Query(default=False, description="Filter to show only active membership types"),
-    current_user: User = Depends(get_current_user)
+    current_user = Depends(get_current_principal)
 ):
     """
     Retrieve all membership types.
     Only authorized users can view membership types.
     """
+    if isinstance(current_user, Client):
+        return await crud.membership.get_membership_types(skip=skip, limit=limit, active_only=True, tenant_id=current_user.tenant_id)
     if current_user.role not in ["admin", "manager", "receptionist", "super_admin"]:
         raise HTTPException(
             status_code=403,

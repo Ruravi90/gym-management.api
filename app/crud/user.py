@@ -80,8 +80,6 @@ async def get_user_by_client_id(client_id: int) -> Optional[User]:
     from app.models.client import Client
     try:
         client = await Client.get(id=client_id)
-        if client and client.user_id:
-            return await User.get(id=client.user_id)
     except DoesNotExist:
         pass
     return None

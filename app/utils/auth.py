@@ -32,6 +32,7 @@ from fastapi import HTTPException, status, Depends, Request
 from fastapi.security import OAuth2PasswordBearer
 from app.config import settings
 from app.models.user import User
+from app.models.client import Client
 
 def create_password_setup_token(user_id: int) -> str:
     return jwt.encode({"sub": str(user_id), "purpose": "password_setup", "exp": datetime.now(timezone.utc) + timedelta(hours=24)}, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
@@ -47,6 +48,8 @@ def verify_password_setup_token(token: str) -> Optional[int]:
 
 ACCESS_TOKEN_COOKIE = "access_token"
 REFRESH_TOKEN_COOKIE = "refresh_token"
+CLIENT_ACCESS_TOKEN_COOKIE = "client_access_token"
+CLIENT_REFRESH_TOKEN_COOKIE = "client_refresh_token"
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -140,6 +143,25 @@ def clear_auth_cookies(response):
     return response
 
 
+def set_client_auth_cookies(response, access_token: str, refresh_token: str, request: Request = None):
+    """Sesión exclusiva del portal; no comparte cookies con el personal."""
+    secure = _is_secure(request) if request else False
+    samesite = "none" if secure else "lax"
+    response.set_cookie(key=CLIENT_ACCESS_TOKEN_COOKIE, value=access_token, httponly=True,
+                        secure=secure, samesite=samesite,
+                        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60, path="/")
+    response.set_cookie(key=CLIENT_REFRESH_TOKEN_COOKIE, value=refresh_token, httponly=True,
+                        secure=secure, samesite=samesite,
+                        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400, path="/")
+    return response
+
+
+def clear_client_auth_cookies(response):
+    response.delete_cookie(CLIENT_ACCESS_TOKEN_COOKIE, path="/")
+    response.delete_cookie(CLIENT_REFRESH_TOKEN_COOKIE, path="/")
+    return response
+
+
 async def get_current_user(request: Request) -> User:
     """Get the current authenticated user from the access_token cookie."""
     credentials_exception = HTTPException(
@@ -170,6 +192,35 @@ async def get_current_user(request: Request) -> User:
         return user
     except Exception:
         raise credentials_exception
+
+
+async def get_current_client(request: Request) -> Client:
+    """Obtiene el socio desde el token del portal, nunca desde User."""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate client credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    token = request.cookies.get(CLIENT_ACCESS_TOKEN_COOKIE)
+    payload = verify_token(token) if token else None
+    if not payload or payload.get("type") != "client_access":
+        raise credentials_exception
+    try:
+        client = await Client.get_or_none(id=int(payload.get("sub")), status=True)
+    except (TypeError, ValueError):
+        client = None
+    if client is None:
+        raise credentials_exception
+    return client
+
+
+async def get_current_principal(request: Request):
+    """Resuelve una sesión administrativa o de cliente, sin compartir identidad."""
+    # Si existen ambas cookies (por ejemplo, al cambiar de portal en el mismo
+    # navegador), la ruta administrativa nunca debe degradarse a identidad de cliente.
+    if request.cookies.get(ACCESS_TOKEN_COOKIE):
+        return await get_current_user(request)
+    return await get_current_client(request)
 
 
 async def authenticate_user(email: str, password: str) -> Optional[User]:

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional
 from app import crud, schemas
 from app.utils.security import AuthenticatedUser, ReceptionistOrAbove
+from app.utils.auth import get_current_principal
 
 router = APIRouter()
 
@@ -10,7 +11,7 @@ DIFFICULTIES = {"beginner", "intermediate", "advanced"}
 
 
 @router.get("/options")
-async def exercise_options(current_user = AuthenticatedUser):
+async def exercise_options(current_user = Depends(get_current_principal)):
     """Opciones oficiales para construir filtros en cualquier cliente."""
     return {
         "training_types": [
@@ -33,7 +34,7 @@ async def list_exercises(
     equipment: Optional[str] = Query(None, description="Equipamiento (barbell, dumbbell, body weight...)"),
     training_type: Optional[str] = Query(None, description="Modalidad (gym, calisthenics, crossfit)"),
     difficulty: Optional[str] = Query(None, description="Nivel (beginner, intermediate, advanced)"),
-    current_user = AuthenticatedUser,
+    current_user = Depends(get_current_principal),
 ):
     """Lista el catálogo de ejercicios (público para usuarios autenticados)."""
     if training_type and training_type not in TRAINING_TYPES:
@@ -47,7 +48,7 @@ async def list_exercises(
 
 
 @router.get("/{exercise_id}", response_model=schemas.routine.ExerciseResponse)
-async def get_exercise(exercise_id: int, current_user = AuthenticatedUser):
+async def get_exercise(exercise_id: int, current_user = Depends(get_current_principal)):
     exercise = await crud.routine.get_exercise(exercise_id)
     if not exercise:
         raise HTTPException(status_code=404, detail="Ejercicio no encontrado")

@@ -8,6 +8,11 @@ from app.utils.auth import (
     verify_refresh_token, get_current_user,
     set_auth_cookies, clear_auth_cookies, REFRESH_TOKEN_COOKIE,
     verify_password_setup_token,
+    set_client_auth_cookies, clear_client_auth_cookies,
+    CLIENT_REFRESH_TOKEN_COOKIE,
+    verify_password,
+    verify_token,
+    get_current_client,
 )
 from app.config import settings
 from app.middleware.security import limiter, auth_limits
@@ -15,6 +20,8 @@ from app.services.qr_service import generate_qr_token
 from app.services.pin_service import generate_pin
 from app.services.checkin_notifier import subscribe_checkin, notify_checkin
 from app.models.user import User
+from app.models.client import Client
+from app.utils.auth import hash_password
 from tortoise.transactions import in_transaction
 from tortoise.expressions import Q
 from secrets import token_urlsafe
@@ -43,14 +50,7 @@ async def _forgot_password(payload: dict, audience: str):
     if not identifier:
         return generic
     user = None
-    if audience == "member":
-        from app.models.client import Client
-        digits = "".join(ch for ch in identifier if ch.isdigit())
-        phone_values = [identifier, digits, f"+52{digits}", f"52{digits}"] if len(digits) == 10 else [identifier]
-        client_matches = await Client.filter(Q(email=identifier.lower()) | Q(phone__in=phone_values)).filter(status=True).prefetch_related("user")
-        users = [client.user for client in client_matches if client.user and client.user.status]
-        user = users[0] if len({item.id for item in users}) == 1 else None
-    else:
+    if audience != "member":
         user = await User.get_or_none(email=identifier.lower())
     if not user and audience == "admin":
         digits = "".join(ch for ch in identifier if ch.isdigit())
@@ -91,7 +91,56 @@ async def _forgot_password(payload: dict, audience: str):
 
 @router.post("/member/forgot-password")
 async def member_forgot_password(payload: dict):
-    return await _forgot_password(payload, "member")
+    identifier = str(payload.get("identifier", "")).strip()
+    normalized_email = identifier.lower()
+    digits = "".join(ch for ch in identifier if ch.isdigit())
+    phone_values = [identifier, digits, f"+52{digits}", f"52{digits}"] if len(digits) == 10 else [identifier]
+    client = await Client.filter(status=True).filter(Q(email=normalized_email) | Q(phone__in=phone_values)).first()
+    generic = {"message": "Si la cuenta existe, se enviará un enlace de recuperación."}
+    if not client or not (client.email or client.phone):
+        return generic
+    raw_token = token_urlsafe(32)
+    client.password_reset_token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+    client.password_reset_expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=20)
+    await client.save(update_fields=["password_reset_token_hash", "password_reset_expires_at", "updated_at"])
+    portal_url = settings.MEMBER_PORTAL_URL or settings.PORTAL_URL
+    link = f"{portal_url.rstrip('/')}/activar-cuenta?reset={raw_token}"
+    email_sent = False
+    if client.email:
+        from app.services.email import send_password_reset_email
+        email_sent = await send_password_reset_email(client.email, client.name, link)
+    if not email_sent and client.phone:
+        from app.services.waha import send_text_result
+        sent, detail = await send_text_result(
+            client.phone,
+            f"🔐 Enlace para restablecer tu contraseña de MyGym:\n{link}",
+            settings.WAHA_MASTER_SESSION,
+        )
+        if not sent:
+            logger.warning("No se pudo enviar recuperación de cliente por WhatsApp: %s", detail)
+    return generic
+
+
+@router.post("/member/set-password")
+async def member_set_password(payload: dict):
+    password = payload.get("password", "")
+    password_error = validate_new_password(password)
+    if password_error:
+        raise HTTPException(status_code=400, detail=password_error)
+    reset = payload.get("reset") or payload.get("reset_token")
+    token_hash = hashlib.sha256(str(reset).encode()).hexdigest() if reset else ""
+    client = await Client.get_or_none(password_reset_token_hash=token_hash, status=True)
+    expires_at = client.password_reset_expires_at if client else None
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if not client or not expires_at or expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=410, detail="El enlace de recuperación es inválido o expiró")
+    from app.utils.auth import hash_password
+    client.hashed_password = hash_password(password)
+    client.password_reset_token_hash = None
+    client.password_reset_expires_at = None
+    await client.save(update_fields=["hashed_password", "password_reset_token_hash", "password_reset_expires_at", "updated_at"])
+    return {"message": "Contraseña actualizada correctamente"}
 
 @router.post("/admin/forgot-password")
 async def admin_forgot_password(payload: dict):
@@ -167,6 +216,45 @@ async def login(request: Request, response: Response, form_data: OAuth2PasswordR
     return {"message": "Login successful"}
 
 
+@router.post("/member/login")
+@limiter.limit(auth_limits)
+async def member_login(request: Request, response: Response, form_data: OAuth2PasswordRequestForm = Depends()):
+    """Login exclusivo del portal: autentica contra clients, no contra users."""
+    identifier = form_data.username.strip().lower()
+    client = await Client.get_or_none(email=identifier, status=True)
+    if client is None or not client.hashed_password or not verify_password(form_data.password, client.hashed_password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Correo o contraseña incorrectos")
+    # Distinguish token type without sharing the admin session cookies.
+    from jose import jwt
+    access_token = jwt.encode({"sub": str(client.id), "principal": "client", "type": "client_access", "exp": datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)}, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    refresh_token = jwt.encode({"sub": str(client.id), "principal": "client", "type": "client_refresh", "exp": datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)}, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    set_client_auth_cookies(response, access_token, refresh_token, request)
+    return {"message": "Login successful"}
+
+
+@router.post("/member/refresh")
+async def member_refresh(request: Request, response: Response):
+    token = request.cookies.get(CLIENT_REFRESH_TOKEN_COOKIE)
+    payload = verify_token(token) if token else None
+    if not payload or payload.get("type") != "client_refresh":
+        raise HTTPException(status_code=401, detail="Sesión de cliente inválida o expirada")
+    client = await Client.get_or_none(id=int(payload.get("sub")), status=True)
+    if not client:
+        raise HTTPException(status_code=401, detail="Socio no encontrado o inactivo")
+    from jose import jwt
+    now = datetime.now(timezone.utc)
+    access = jwt.encode({"sub": str(client.id), "principal": "client", "type": "client_access", "exp": now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)}, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    refresh = jwt.encode({"sub": str(client.id), "principal": "client", "type": "client_refresh", "exp": now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)}, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    set_client_auth_cookies(response, access, refresh, request)
+    return {"message": "Token refreshed"}
+
+
+@router.post("/member/logout")
+async def member_logout(response: Response):
+    clear_client_auth_cookies(response)
+    return {"message": "Logout successful"}
+
+
 @router.post("/refresh")
 @limiter.limit(auth_limits)
 async def refresh_token(request: Request, response: Response):
@@ -231,67 +319,40 @@ async def logout(request: Request, response: Response):
     return {"message": "Logged out"}
 
 
-@router.post("/register", response_model=schemas.User)
+@router.post("/register", response_model=schemas.Client)
 @limiter.limit(auth_limits)
 async def register(request: Request, user_data: schemas.UserRegister):
     """
     Register a new user.
     """
-    # Check if user already exists
-    existing_user = await crud.user.get_user_by_email(email=user_data.email)
-    if existing_user:
+    existing_client = await crud.client.get_client_by_email(email=user_data.email)
+    if existing_client:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
 
-    # Create user with hashed password
-    user_dict = {
-        "email": user_data.email,
-        "name": user_data.name,
-        "phone": user_data.phone,
-        "password": user_data.password
-    }
-
-    # Assign to the default tenant if tenant_id is provided
     tenant_id = getattr(user_data, 'tenant_id', None)
-
-    user = await crud.user.create_user(user_data=user_dict, tenant_id=tenant_id)
-
-    # Automatically link existing client profile if found or create a new one
-    client = await crud.client.get_client_by_email(email=user_data.email, tenant_id=tenant_id)
-    if client:
-        if client.user_id is None:
-            await crud.client.update_client(client_id=client.id, client_update={"user_id": user.id}, tenant_id=tenant_id)
-    else:
-        # Create a new client profile for the user
-        await crud.client.create_client(client_data={
-            "name": user_data.name,
-            "email": user_data.email,
-            "phone": user_data.phone,
-            "user_id": user.id,
-            "status": True
-        }, tenant_id=tenant_id)
-
-    return user
+    client = await crud.client.create_client(client_data={
+        "name": user_data.name,
+        "email": user_data.email,
+        "phone": user_data.phone,
+        "hashed_password": hash_password(user_data.password),
+        "status": True,
+    }, tenant_id=tenant_id)
+    return client
 
 
 @router.get("/my-qr-token")
 @limiter.limit("30 per minute")
-async def get_my_qr_token(request: Request, current_user = Depends(get_current_user)):
-    client = await crud.client.get_client_by_user_id(user_id=current_user.id)
-    if not client:
-        raise HTTPException(status_code=404, detail="No se encontró perfil de cliente asociado a tu cuenta")
+async def get_my_qr_token(request: Request, client = Depends(get_current_client)):
     token = generate_qr_token(client.id)
     return {"token": token, "expires_in": 30}
 
 
 @router.get("/my-pin")
 @limiter.limit("30 per minute")
-async def get_my_pin(request: Request, current_user = Depends(get_current_user)):
-    client = await crud.client.get_client_by_user_id(user_id=current_user.id)
-    if not client:
-        raise HTTPException(status_code=404, detail="No se encontró perfil de cliente asociado a tu cuenta")
+async def get_my_pin(request: Request, client = Depends(get_current_client)):
     pin = generate_pin(client.id)
     return {"pin": pin, "expires_in": 60}
 
