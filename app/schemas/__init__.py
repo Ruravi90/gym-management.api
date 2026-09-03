@@ -1,6 +1,6 @@
 print("Loading schemas __init__.py...")
 from .user import User, UserCreate, UserUpdate
-from .client import Client, ClientCreate, ClientUpdate
+from .client import Client, ClientCreate, ClientUpdate, MemberProfileUpdate
 from .membership import Membership, MembershipCreate, MembershipUpdate, MembershipStatistics, MembershipType, MembershipTypeCreate, MembershipTypeUpdate, PunchUsage
 from .attendance import Attendance, AttendanceCreate, AttendanceUpdate
 from .gym_class import GymClass, GymClassCreate, GymClassUpdate
@@ -20,6 +20,7 @@ __all__ = [
     "Client",
     "ClientCreate",
     "ClientUpdate",
+    "MemberProfileUpdate",
     "Membership",
     "MembershipCreate",
     "MembershipUpdate",

@@ -371,7 +371,13 @@ async def generate_routine(
     profile_owner = client
     effective_goal = request.goal if request.goal != "general" else (client.goal or request.goal)
     effective_injuries = "; ".join(value for value in (client.injuries, client.restrictions, request.injuries) if value)
+    body_type_aliases = {
+        "ectomorfo": "ectomorph",
+        "mesomorfo": "mesomorph",
+        "endomorfo": "endomorph",
+    }
     body_type = request.body_type.strip().lower() if request.body_type else (client.body_type or "")
+    body_type = body_type_aliases.get(body_type, body_type)
     if body_type and body_type not in schemas.routine.BODY_TYPES:
         raise HTTPException(
             status_code=400,
@@ -395,6 +401,9 @@ async def generate_routine(
     # Guardar el intake del instructor en el perfil
     profile_data = request.model_dump(exclude_unset=True)
     profile_data["body_type"] = body_type
+    # Las molestias capturadas al generar una rutina son temporales y no
+    # deben sobrescribir las lesiones permanentes del perfil del socio.
+    profile_data.pop("injuries", None)
     # En Admin, el intake pertenece al cliente seleccionado, no al administrador.
     await _save_profile(profile_owner, profile_data)
 
