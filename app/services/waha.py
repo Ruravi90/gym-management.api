@@ -8,6 +8,77 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
+def tenant_session_name(tenant_id: int) -> str:
+    return f"tenant-{tenant_id}"
+
+
+async def _waha_request(method: str, path: str, **kwargs) -> httpx.Response:
+    if not settings.WAHA_ENABLED or not settings.WAHA_BASE_URL:
+        raise RuntimeError("WAHA está deshabilitado o no tiene URL configurada")
+    api_key = settings.WAHA_API_KEY_PLAIN or settings.WAHA_API_KEY
+    if api_key.startswith("sha512:"):
+        api_key = ""
+    headers = {"X-Api-Key": api_key} if api_key else {}
+    async with httpx.AsyncClient(timeout=settings.WAHA_TIMEOUT_SECONDS) as client:
+        return await client.request(method, f"{settings.WAHA_BASE_URL.rstrip('/')}{path}", headers=headers, **kwargs)
+
+
+async def create_or_start_tenant_session(tenant_id: int) -> dict:
+    session = tenant_session_name(tenant_id)
+    response = await _waha_request("POST", "/api/sessions", json={"name": session})
+    if response.status_code not in (200, 201, 409):
+        response.raise_for_status()
+    status_response = await _waha_request("GET", f"/api/sessions/{session}")
+    if status_response.status_code == 404:
+        start_response = await _waha_request("POST", f"/api/sessions/{session}/start")
+        if start_response.status_code not in (200, 201, 202, 409):
+            start_response.raise_for_status()
+        status_response = await _waha_request("GET", f"/api/sessions/{session}")
+    status_response.raise_for_status()
+    return {"session": session, **status_response.json()}
+
+
+async def get_tenant_session_status(tenant_id: int) -> dict:
+    return await get_session_status(tenant_session_name(tenant_id))
+
+
+async def get_session_status(session: str) -> dict:
+    response = await _waha_request("GET", f"/api/sessions/{session}")
+    if response.status_code == 404:
+        return {"session": session, "status": "NOT_FOUND", "active": False}
+    response.raise_for_status()
+    data = response.json()
+    return {"session": session, **data, "active": data.get("status") == "WORKING"}
+
+
+async def get_tenant_qr(tenant_id: int) -> httpx.Response:
+    return await get_session_qr(tenant_session_name(tenant_id))
+
+
+async def get_session_qr(session: str) -> httpx.Response:
+    return await _waha_request("GET", f"/api/{session}/auth/qr")
+
+
+async def logout_tenant_session(tenant_id: int) -> dict:
+    return await logout_session(tenant_session_name(tenant_id))
+
+
+async def logout_session(session: str) -> dict:
+    response = await _waha_request("POST", f"/api/sessions/{session}/logout")
+    if response.status_code == 404:
+        return {"session": session, "status": "NOT_FOUND"}
+    response.raise_for_status()
+    return {"session": session, "status": "LOGGED_OUT"}
+
+
+async def delete_session(session: str) -> dict:
+    response = await _waha_request("DELETE", f"/api/sessions/{session}")
+    if response.status_code == 404:
+        return {"session": session, "status": "NOT_FOUND"}
+    response.raise_for_status()
+    return {"session": session, "status": "DELETED"}
+
+
 def normalize_phone(phone: str) -> str:
     digits = phone_digits(phone)
     return f"{digits}@c.us"

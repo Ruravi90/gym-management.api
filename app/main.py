@@ -22,6 +22,7 @@ from app.api.routines import router as routines_router
 from app.api.mentor import router as mentor_router
 from app.api.measurements import router as measurements_router
 from app.api.tenants import router as tenants_router
+from app.api.tenant_whatsapp import router as tenant_whatsapp_router
 from app.api.webhooks import router as webhooks_router
 from app.api.billing import router as billing_router
 from app.middleware.security import add_security_middleware, limiter, common_limits, auth_limits, file_upload_limits
@@ -95,6 +96,7 @@ logger.info("Including measurements router...")
 app.include_router(measurements_router, prefix="/measurements", tags=["measurements"])
 logger.info("Including tenants router...")
 app.include_router(tenants_router, prefix="/tenants", tags=["tenants"])
+app.include_router(tenant_whatsapp_router, prefix="/tenant/whatsapp", tags=["tenant-whatsapp"])
 app.include_router(webhooks_router, prefix="/webhooks", tags=["webhooks"])
 app.include_router(billing_router, prefix="/billing", tags=["billing"])
 logger.info("All routers included successfully")

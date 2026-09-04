@@ -76,9 +76,14 @@ async def seed_super_admin():
             role=UserRoleEnum.SUPER_ADMIN,
             hashed_password=hash_password(super_admin_pass),
             status=True,
-            tenant=None,  # Super admin no pertenece a ningún tenant
+            tenant=default_tenant,
         )
         logger.info(f"Super admin user created with ID: {super_admin.id}")
+    elif existing_admin.tenant_id is None:
+        # El Super Admin conserva sus permisos globales, pero necesita un tenant
+        # operativo para poder conectar su propio WhatsApp desde el portal.
+        existing_admin.tenant_id = default_tenant.id
+        await existing_admin.save(update_fields=["tenant_id", "updated_at"])
 
     existing_admin = await User.filter(email=admin_email).first()
     if not existing_admin:

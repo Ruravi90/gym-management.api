@@ -8,7 +8,7 @@ from app.crud import tenant as tenant_crud
 from app.utils.tenant import require_super_admin
 from app.models.user import User as UserModel
 from app.config import settings
-from app.services.waha import send_text, send_text_result
+from app.services.waha import send_text, send_text_result, delete_session, tenant_session_name
 
 router = APIRouter()
 
@@ -37,6 +37,15 @@ async def waha_test_message(payload: dict, current_user: UserModel = Depends(req
     if not sent:
         raise HTTPException(status_code=502, detail=detail or "WAHA no aceptó el envío del mensaje")
     return {"message": "Mensaje enviado correctamente", "phone": f"+52{phone}"}
+
+
+@router.delete("/{tenant_id}/waha-session")
+async def delete_tenant_waha_session(tenant_id: int, current_user: UserModel = Depends(require_super_admin)):
+    """Elimina una sesión propia de tenant; la sesión master nunca se elimina aquí."""
+    tenant = await tenant_crud.get_tenant(tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant no encontrado")
+    return await delete_session(tenant_session_name(tenant_id))
 
 
 def _slug_base(name: str) -> str:

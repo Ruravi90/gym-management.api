@@ -6,6 +6,11 @@ from app.utils.auth import get_current_user
 
 from app.models.user import User as UserModel
 from app.utils.auth import hash_password
+from app.config import settings
+from app.services.waha import send_text_result, tenant_session_name
+from secrets import token_urlsafe
+import hashlib
+from datetime import datetime, timedelta, timezone
 
 from app.utils.logging import logger
 from app.services.billing_limits import ensure_within_limit
@@ -39,12 +44,24 @@ async def create_client(client: schemas.ClientCreate, current_user: UserModel = 
     if client.password:
         client_data["hashed_password"] = hash_password(client.password)
 
-    return await crud.client.create_client(
+    created = await crud.client.create_client(
         client_data=client_data,
         ip_address=None,
         user_agent=None,
         tenant_id=tenant_id,
     )
+    if created.phone and (settings.MEMBER_PORTAL_URL or settings.PORTAL_URL):
+        raw_token = token_urlsafe(32)
+        created.password_reset_token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        created.password_reset_expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=20)
+        await created.save(update_fields=["password_reset_token_hash", "password_reset_expires_at", "updated_at"])
+        portal_url = settings.MEMBER_PORTAL_URL or settings.PORTAL_URL
+        link = f"{portal_url.rstrip('/')}/activar-cuenta?reset={raw_token}"
+        session = settings.WAHA_MASTER_SESSION if current_user.role == "super_admin" else tenant_session_name(tenant_id)
+        sent, detail = await send_text_result(created.phone, f"¡Bienvenido a tu gimnasio, {created.name}!\n\nTu acceso al portal ya está listo. Crea tu contraseña aquí:\n{link}\n\nEste enlace es válido durante 20 minutos.", session)
+        if not sent:
+            logger.warning("No se pudo enviar bienvenida por WhatsApp al miembro %s: %s", created.id, detail)
+    return created
 
 @router.get("", response_model=List[schemas.Client])
 async def read_clients(skip: int = 0, limit: int = 100, current_user: UserModel = Depends(get_current_user)):

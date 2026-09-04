@@ -6,10 +6,11 @@ from app.utils.auth import get_current_user
 
 from app.models.user import User as UserModel
 from app.services.billing_limits import ensure_within_limit
-from app.services.waha import send_text
+from app.services.waha import send_text_result, tenant_session_name
 from app.config import settings
 from app.utils.auth import create_password_setup_token
 from app.models.tenant import Tenant
+from app.utils.logging import logger
 
 router = APIRouter()
 
@@ -38,7 +39,10 @@ async def create_user(user: schemas.UserCreate, current_user: UserModel = Depend
         tenant = await Tenant.get_or_none(id=tenant_id) if tenant_id else None
         setup_url = f"{settings.PORTAL_URL.rstrip('/')}/activar-cuenta?token={create_password_setup_token(db_user.id)}"
         tenant_name = tenant.name if tenant else "MyGym"
-        await send_text(db_user.phone, f"¡Bienvenido a {tenant_name}, {db_user.name}! Tu acceso al portal de socios ya está listo. Crea tu contraseña aquí: {setup_url}", settings.WAHA_MASTER_SESSION)
+        session = settings.WAHA_MASTER_SESSION if current_user.role == "super_admin" else tenant_session_name(tenant_id)
+        sent, detail = await send_text_result(db_user.phone, f"¡Bienvenido a {tenant_name}, {db_user.name}!\n\nTu acceso al portal ya está listo. Crea tu contraseña aquí: {setup_url}\n\nEste enlace es válido durante 20 minutos.", session)
+        if not sent:
+            logger.warning("No se pudo enviar bienvenida por WhatsApp al usuario %s: %s", db_user.id, detail)
     return db_user
 
 
